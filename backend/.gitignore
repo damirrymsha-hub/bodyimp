@@ -1,0 +1,13 @@
+# Окружение и секреты
+.env
+
+# База данных SQLite
+*.db
+*.db-journal
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/

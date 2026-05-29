@@ -1,0 +1,53 @@
+"""
+Роут анализа фото еды через OpenRouter vision-модели.
+Возвращает {"success": True, "data": {...}} либо подробную ошибку.
+"""
+import logging
+
+from fastapi import APIRouter, HTTPException
+
+import schemas
+from services.openrouter_service import analyze_food_photo
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/analyze", tags=["analyze"])
+
+
+@router.post("/photo")
+async def analyze_photo(payload: schemas.PhotoAnalyzeRequest):
+    """
+    Принимает base64 изображения, возвращает распознанные КБЖУ.
+    Формат ответа:
+      - успех:      {"success": True, "data": {...}}
+      - нет еды:    {"success": False, "error": "no_food", "message": "..."}
+      - ошибка:     HTTP 4xx/5xx с detail.
+    """
+    try:
+        logger.debug(f"Received photo, base64 length: {len(payload.image_base64)}")
+
+        if not payload.image_base64:
+            raise HTTPException(400, "Фото не получено")
+
+        # Слишком маленькое = пустое/повреждённое.
+        if len(payload.image_base64) < 1000:
+            raise HTTPException(400, "Фото слишком маленькое или повреждённое")
+
+        result = await analyze_food_photo(
+            payload.image_base64,
+            payload.mime_type or "image/jpeg",
+        )
+
+        if "error" in result:
+            return {"success": False, "error": "no_food", "message": "На фото не обнаружена еда"}
+
+        return {"success": True, "data": result}
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        logger.error(f"Config error: {e}")
+        raise HTTPException(500, str(e))
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"Analysis failed: {type(e).__name__}: {e}")
+        raise HTTPException(500, f"Ошибка анализа: {str(e)}")
