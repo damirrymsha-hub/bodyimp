@@ -56,6 +56,9 @@ class User(Base):
     weight_logs = relationship(
         "WeightLog", back_populates="user", cascade="all, delete-orphan"
     )
+    favorite_foods = relationship(
+        "FavoriteFood", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class FoodEntry(Base):
@@ -110,6 +113,28 @@ class ActivityEntry(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="activity_entries")
+
+
+class FavoriteFood(Base):
+    """Избранный продукт пользователя для быстрого добавления."""
+
+    __tablename__ = "favorite_foods"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    name = Column(String, nullable=False)
+    calories = Column(Float, nullable=False)        # базовые значения (на 100 г или на 1 шт)
+    protein_g = Column(Float, default=0)
+    fat_g = Column(Float, default=0)
+    carbs_g = Column(Float, default=0)
+    # Тип порции: "grams" (вводить граммы) или "piece" (вводить штуки)
+    portion_type = Column(String, default="grams")
+    # Базовый вес: для "grams" — основа в граммах (обычно 100),
+    # для "piece" — средний вес одной штуки в граммах.
+    base_weight_g = Column(Float, default=100)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="favorite_foods")
 
 
 class WeightLog(Base):

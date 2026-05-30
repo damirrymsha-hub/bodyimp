@@ -3,16 +3,17 @@
 // Если передан editingEntry — окно открывается сразу в режиме правки.
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { X, PencilLine, Camera, Search, Trash2 } from 'lucide-react'
+import { X, PencilLine, Camera, Search, Star, Trash2 } from 'lucide-react'
 import { z } from 'zod'
 import { useUserStore } from '../store/userStore'
 import { useUIStore } from '../store/uiStore'
 import { haptic, hapticSuccess } from '../lib/telegram'
-import { POPULAR_FOODS } from '../data/popularFoods'
 import type { MealType, PhotoAnalysisResult, FoodEntry } from '../types'
 import ScanFood from './ScanFood'
+import SearchTab from '../components/SearchTab'
+import FavoritesTab from '../components/FavoritesTab'
 
-type Mode = 'menu' | 'manual' | 'photo' | 'search'
+type Mode = 'menu' | 'manual' | 'photo' | 'search' | 'favorites'
 type UnitMode = 'portion' | 'per100'
 
 const MEALS: { value: MealType; label: string }[] = [
@@ -40,8 +41,11 @@ export default function AddFood({ onClose, editingEntry }: Props) {
   const isEditing = !!editingEntry
   const [mode, setMode] = useState<Mode>(isEditing ? 'manual' : 'menu')
   const [meal, setMeal] = useState<MealType>(editingEntry?.meal_type ?? 'snack')
-  const { addFood, updateFood, removeFood } = useUserStore()
+  const { addFood, updateFood, removeFood, addFavorite } = useUserStore()
   const { showToast } = useUIStore()
+
+  // Чекбокс «Сохранить в избранное» (только при ручном добавлении).
+  const [saveFav, setSaveFav] = useState(false)
 
   // Режим ввода базовых КБЖУ: на порцию или на 100 г.
   const initUnit: UnitMode = editingEntry?.base_per_100g ? 'per100' : 'portion'
@@ -65,8 +69,6 @@ export default function AddFood({ onClose, editingEntry }: Props) {
   const [protein, setProtein] = useState(back(editingEntry?.protein_g))
   const [fat, setFat] = useState(back(editingEntry?.fat_g))
   const [carbs, setCarbs] = useState(back(editingEntry?.carbs_g))
-
-  const [query, setQuery] = useState('')
 
   // Множитель пересчёта: порции = ×N, 100 г = ×(граммы/100).
   const q = Number(qty) || 0
@@ -99,6 +101,18 @@ export default function AddFood({ onClose, editingEntry }: Props) {
       showToast('Сохранено', 'success')
     } else {
       await addFood({ ...base, meal_type: meal, source: 'manual' })
+      // Опционально — сохранить продукт в избранное (базовые значения).
+      if (saveFav) {
+        await addFavorite({
+          name: parsed.data.name,
+          calories: Number(calories) || 0,
+          protein_g: Number(protein) || 0,
+          fat_g: Number(fat) || 0,
+          carbs_g: Number(carbs) || 0,
+          portion_type: 'grams',
+          base_weight_g: 100,
+        })
+      }
       showToast('Добавлено', 'success')
     }
     hapticSuccess()
@@ -138,10 +152,6 @@ export default function AddFood({ onClose, editingEntry }: Props) {
     })
   }
 
-  const filtered = POPULAR_FOODS.filter((f) =>
-    f.name.toLowerCase().includes(query.toLowerCase()),
-  )
-
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40">
       <motion.div
@@ -162,7 +172,9 @@ export default function AddFood({ onClose, editingEntry }: Props) {
                   ? 'Вручную'
                   : mode === 'photo'
                     ? 'Сфотографировать'
-                    : 'Быстрый поиск'}
+                    : mode === 'favorites'
+                      ? 'Избранное'
+                      : 'Быстрый поиск'}
           </h2>
           <button
             onClick={() =>
@@ -215,10 +227,19 @@ export default function AddFood({ onClose, editingEntry }: Props) {
             <ModeButton
               icon={<Search size={22} />}
               title="Быстрый поиск"
-              subtitle="Популярные блюда"
+              subtitle="База продуктов"
               onClick={() => {
                 haptic('light')
                 setMode('search')
+              }}
+            />
+            <ModeButton
+              icon={<Star size={22} />}
+              title="Избранное"
+              subtitle="Сохранённые продукты"
+              onClick={() => {
+                haptic('light')
+                setMode('favorites')
               }}
             />
           </div>
@@ -330,6 +351,24 @@ export default function AddFood({ onClose, editingEntry }: Props) {
               {computed.fat_g}г · У {computed.carbs_g}г
             </div>
 
+            {/* Чекбокс «Сохранить в избранное» (только при добавлении) */}
+            {!isEditing && (
+              <button
+                onClick={() => {
+                  haptic('light')
+                  setSaveFav((v) => !v)
+                }}
+                className="flex items-center gap-2 text-left text-sm font-medium text-ink"
+              >
+                <Star
+                  size={18}
+                  className={saveFav ? 'text-yellow-400' : 'text-muted'}
+                  fill={saveFav ? 'currentColor' : 'none'}
+                />
+                Сохранить в избранное
+              </button>
+            )}
+
             <button
               onClick={handleManualSave}
               className="mt-1 rounded-2xl bg-ink py-4 text-sm font-semibold text-white"
@@ -354,45 +393,12 @@ export default function AddFood({ onClose, editingEntry }: Props) {
           <ScanFood onConfirm={handlePhotoConfirm} onManual={() => setMode('manual')} />
         )}
 
-        {/* Быстрый поиск */}
-        {mode === 'search' && (
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2 rounded-2xl bg-card px-4 py-3 shadow-card">
-              <Search size={18} className="text-muted" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Поиск блюда"
-                className="w-full bg-transparent text-sm outline-none"
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              {filtered.map((f) => (
-                <button
-                  key={f.name}
-                  onClick={() =>
-                    saveAndClose({
-                      name: f.name,
-                      calories: f.calories,
-                      protein_g: f.protein_g,
-                      fat_g: f.fat_g,
-                      carbs_g: f.carbs_g,
-                      source: 'scan',
-                    })
-                  }
-                  className="flex items-center justify-between rounded-3xl bg-card p-4 text-left shadow-card"
-                >
-                  <span className="text-sm font-medium">{f.name}</span>
-                  <span className="text-sm font-bold">{f.calories}</span>
-                </button>
-              ))}
-              {filtered.length === 0 && (
-                <div className="py-8 text-center text-sm text-muted">
-                  Ничего не найдено
-                </div>
-              )}
-            </div>
-          </div>
+        {/* Быстрый поиск по базе продуктов */}
+        {mode === 'search' && <SearchTab meal={meal} onAdded={onClose} />}
+
+        {/* Избранное */}
+        {mode === 'favorites' && (
+          <FavoritesTab meal={meal} onAdded={onClose} />
         )}
       </motion.div>
     </div>

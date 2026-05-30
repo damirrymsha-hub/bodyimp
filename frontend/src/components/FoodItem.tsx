@@ -1,7 +1,8 @@
-// Элемент списка еды за день: название, тип приёма, ккал + кнопка удаления.
-import { Trash2 } from 'lucide-react'
+// Элемент списка еды за день: название, тип приёма, ккал, ⭐ избранное + удаление.
+import { Trash2, Star } from 'lucide-react'
 import type { FoodEntry, MealType } from '../types'
 import { haptic } from '../lib/telegram'
+import { useUserStore } from '../store/userStore'
 
 const MEAL_LABELS: Record<MealType, string> = {
   breakfast: 'Завтрак',
@@ -17,6 +18,29 @@ interface Props {
 }
 
 export default function FoodItem({ entry, onDelete, onEdit }: Props) {
+  const { isFavorite, favoriteByName, addFavorite, removeFavorite } = useUserStore()
+  const fav = isFavorite(entry.name)
+
+  // Переключить избранное по этой записи (значения берём из записи).
+  function toggleFav(e: React.MouseEvent) {
+    e.stopPropagation() // не открывать редактирование
+    haptic('light')
+    if (fav) {
+      const f = favoriteByName(entry.name)
+      if (f) removeFavorite(f.id)
+    } else {
+      addFavorite({
+        name: entry.name,
+        calories: entry.calories,
+        protein_g: entry.protein_g,
+        fat_g: entry.fat_g,
+        carbs_g: entry.carbs_g,
+        portion_type: 'grams',
+        base_weight_g: 100,
+      })
+    }
+  }
+
   return (
     // Клик по строке открывает форму редактирования.
     <div
@@ -37,6 +61,18 @@ export default function FoodItem({ entry, onDelete, onEdit }: Props) {
         <div className="text-sm font-bold">{Math.round(entry.calories)}</div>
         <div className="text-[10px] text-muted">ккал</div>
       </div>
+      {/* Избранное */}
+      <button
+        onClick={toggleFav}
+        className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-ink/5"
+        aria-label="В избранное"
+      >
+        <Star
+          size={16}
+          className={fav ? 'text-yellow-400' : 'text-muted'}
+          fill={fav ? 'currentColor' : 'none'}
+        />
+      </button>
       <button
         onClick={(e) => {
           e.stopPropagation() // не открывать редактирование при быстром удалении

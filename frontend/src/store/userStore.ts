@@ -1,7 +1,13 @@
 // Глобальное состояние BodyImp (Zustand).
 // Хранит профиль и данные ВЫБРАННОГО дня: питание, воду, активность.
 import { create } from 'zustand'
-import type { FoodEntry, ActivityEntry, User, ActivityType } from '../types'
+import type {
+  FoodEntry,
+  ActivityEntry,
+  User,
+  ActivityType,
+  FavoriteFood,
+} from '../types'
 import {
   getUser,
   registerUser,
@@ -14,8 +20,12 @@ import {
   addWater as apiAddWater,
   addActivity as apiAddActivity,
   deleteActivity as apiDeleteActivity,
+  getFavorites,
+  addFavorite as apiAddFavorite,
+  deleteFavorite as apiDeleteFavorite,
   type FoodAddPayload,
   type FoodUpdatePayload,
+  type FavoriteAddPayload,
 } from '../api/client'
 import { enqueueFood, flushQueue } from '../lib/offlineQueue'
 import { todayISO } from '../lib/date'
@@ -34,6 +44,7 @@ interface UserState {
   foods: FoodEntry[]
   waterMl: number
   activities: ActivityEntry[]
+  favorites: FavoriteFood[]
   loading: boolean
   error: string | null
 
@@ -47,6 +58,13 @@ interface UserState {
   removeActivity: (entryId: number) => Promise<void>
   setUser: (user: User) => void
 
+  // Избранное
+  loadFavorites: () => Promise<void>
+  addFavorite: (payload: FavoriteAddPayload) => Promise<void>
+  removeFavorite: (favId: number) => Promise<void>
+  isFavorite: (name: string) => boolean
+  favoriteByName: (name: string) => FavoriteFood | undefined
+
   totals: () => Totals
   burnedTotal: () => number
   netCalories: () => number
@@ -59,6 +77,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   foods: [],
   waterMl: 0,
   activities: [],
+  favorites: [],
   loading: false,
   error: null,
 
@@ -75,6 +94,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       set({ user })
       await flushQueue() // досылаем оффлайн-очередь
       await get().loadDay(todayISO())
+      await get().loadFavorites()
     } catch {
       set({ error: 'Не удалось подключиться к серверу' })
     } finally {
@@ -184,6 +204,46 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   setUser: (user) => set({ user }),
+
+  // ---------- Избранное ----------
+  loadFavorites: async () => {
+    const { user } = get()
+    if (!user) return
+    try {
+      const favorites = await getFavorites(user.id)
+      set({ favorites })
+    } catch {
+      /* молча — избранное не критично */
+    }
+  },
+
+  addFavorite: async (payload) => {
+    const { user } = get()
+    if (!user) return
+    try {
+      const fav = await apiAddFavorite(user.id, payload)
+      set({ favorites: [fav, ...get().favorites] })
+    } catch {
+      // Дубликат (400) или сеть — игнорируем, список не меняем.
+    }
+  },
+
+  removeFavorite: async (favId) => {
+    const { user } = get()
+    if (!user) return
+    try {
+      await apiDeleteFavorite(user.id, favId)
+    } catch {
+      /* всё равно убираем локально */
+    }
+    set({ favorites: get().favorites.filter((f) => f.id !== favId) })
+  },
+
+  isFavorite: (name) =>
+    get().favorites.some((f) => f.name.toLowerCase() === name.toLowerCase()),
+
+  favoriteByName: (name) =>
+    get().favorites.find((f) => f.name.toLowerCase() === name.toLowerCase()),
 
   // Суммарные КБЖУ за выбранный день.
   totals: () => {

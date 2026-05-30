@@ -1,7 +1,7 @@
 // Сканирование еды по фото: выбор/съёмка фото → отправка на /api/analyze/photo
 // → показ результата для подтверждения перед сохранением.
 import { useRef, useState } from 'react'
-import { Camera, Loader2, RotateCcw } from 'lucide-react'
+import { Camera, ImagePlus, Loader2, RotateCcw } from 'lucide-react'
 import { analyzePhoto } from '../api/client'
 import type { PhotoAnalysisResult } from '../types'
 import { useUIStore } from '../store/uiStore'
@@ -28,7 +28,9 @@ function fileToBase64(file: File): Promise<{ base64: string; mime: string }> {
 }
 
 export default function ScanFood({ onConfirm, onManual }: Props) {
-  const fileRef = useRef<HTMLInputElement>(null)
+  // Два отдельных input: камера (capture) и галерея (без capture).
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<PhotoAnalysisResult | null>(null)
@@ -36,6 +38,8 @@ export default function ScanFood({ onConfirm, onManual }: Props) {
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
+    // Сброс value — чтобы можно было выбрать то же фото повторно.
+    e.target.value = ''
     if (!file) return
 
     setPreview(URL.createObjectURL(file))
@@ -75,28 +79,49 @@ export default function ScanFood({ onConfirm, onManual }: Props) {
   function reset() {
     setPreview(null)
     setResult(null)
-    if (fileRef.current) fileRef.current.value = ''
+    if (cameraInputRef.current) cameraInputRef.current.value = ''
+    if (galleryInputRef.current) galleryInputRef.current.value = ''
   }
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Input для камеры — capture открывает заднюю камеру */}
       <input
-        ref={fileRef}
+        ref={cameraInputRef}
         type="file"
         accept="image/*"
         capture="environment"
         className="hidden"
         onChange={handleFile}
       />
+      {/* Input для галереи — без capture */}
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFile}
+      />
 
       {!preview && (
-        <button
-          onClick={() => fileRef.current?.click()}
-          className="flex flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-ink/15 bg-card py-12 text-muted"
-        >
-          <Camera size={36} className="text-ink" />
-          <span className="text-sm font-medium">Сделать или выбрать фото еды</span>
-        </button>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => cameraInputRef.current?.click()}
+            className="flex flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-ink/15 bg-card py-10 text-muted"
+          >
+            <Camera size={32} className="text-ink" />
+            <span className="text-sm font-semibold text-ink">Сфотографировать</span>
+            <span className="text-xs">Открыть камеру</span>
+          </button>
+          <button
+            onClick={() => galleryInputRef.current?.click()}
+            className="flex flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-ink/15 bg-card py-10 text-muted"
+          >
+            <ImagePlus size={32} className="text-ink" />
+            <span className="text-sm font-semibold text-ink">Из галереи</span>
+            <span className="text-xs">Выбрать фото</span>
+          </button>
+        </div>
       )}
 
       {preview && (

@@ -152,6 +152,34 @@ class ActivityOut(BaseModel):
         from_attributes = True
 
 
+# ---------- Избранное ----------
+class FavoriteFoodCreate(BaseModel):
+    """Данные для добавления продукта в избранное."""
+    name: str
+    calories: float
+    protein_g: float = 0
+    fat_g: float = 0
+    carbs_g: float = 0
+    portion_type: str = "grams"   # "grams" | "piece"
+    base_weight_g: float = 100
+
+
+class FavoriteFoodOut(BaseModel):
+    id: int
+    user_id: int
+    name: str
+    calories: float
+    protein_g: float
+    fat_g: float
+    carbs_g: float
+    portion_type: str
+    base_weight_g: float
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 # ---------- Статистика ----------
 class DailyCalories(BaseModel):
     date: date_type

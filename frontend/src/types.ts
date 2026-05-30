@@ -61,6 +61,37 @@ export interface ActivityEntry {
   created_at: string
 }
 
+// Тип порции продукта: вводить граммы или штуки.
+export type PortionType = 'grams' | 'piece'
+
+// Продукт из встроенной базы поиска (значения на 100 г).
+export interface SearchFood {
+  id: number
+  name: string
+  category: string
+  calories_per_100g: number
+  protein_per_100g: number
+  fat_per_100g: number
+  carbs_per_100g: number
+  portion_type: PortionType
+  piece_weight_g?: number // вес 1 шт (для portion_type='piece')
+  default_amount: number  // граммов или штук по умолчанию
+}
+
+// Избранный продукт пользователя (хранится на бэкенде).
+export interface FavoriteFood {
+  id: number
+  user_id: number
+  name: string
+  calories: number      // базовые значения (на 100 г или на 1 шт)
+  protein_g: number
+  fat_g: number
+  carbs_g: number
+  portion_type: PortionType
+  base_weight_g: number // основа в граммах (100) либо вес 1 шт
+  created_at: string
+}
+
 export interface WaterToday {
   total_ml: number
   date: string

@@ -14,6 +14,9 @@ import type {
   ActivityLevel,
   ActivityEntry,
   ActivityType,
+  FavoriteFood,
+  SearchFood,
+  PortionType,
 } from '../types'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -187,6 +190,57 @@ export async function getTodayActivity(
 
 export async function deleteActivity(entryId: number): Promise<void> {
   await api.delete(`/api/activity/${entryId}`)
+}
+
+// ---------- Избранное ----------
+export interface FavoriteAddPayload {
+  name: string
+  calories: number
+  protein_g: number
+  fat_g: number
+  carbs_g: number
+  portion_type?: PortionType
+  base_weight_g?: number
+}
+
+export async function getFavorites(userId: number): Promise<FavoriteFood[]> {
+  const { data } = await api.get<FavoriteFood[]>(`/api/favorites/${userId}`)
+  return data
+}
+
+export async function addFavorite(
+  userId: number,
+  payload: FavoriteAddPayload,
+): Promise<FavoriteFood> {
+  const { data } = await api.post<FavoriteFood>(`/api/favorites/${userId}`, payload)
+  return data
+}
+
+export async function deleteFavorite(
+  userId: number,
+  foodId: number,
+): Promise<void> {
+  await api.delete(`/api/favorites/${userId}/${foodId}`)
+}
+
+// ---------- Поиск по базе продуктов ----------
+export async function searchFoods(q: string): Promise<SearchFood[]> {
+  const { data } = await api.get<SearchFood[]>('/api/food-search/', {
+    params: { q },
+  })
+  return data
+}
+
+export async function getFoodCategories(): Promise<string[]> {
+  const { data } = await api.get<string[]>('/api/food-search/categories')
+  return data
+}
+
+export async function getFoodsByCategory(category: string): Promise<SearchFood[]> {
+  const { data } = await api.get<SearchFood[]>(
+    `/api/food-search/category/${encodeURIComponent(category)}`,
+  )
+  return data
 }
 
 // ---------- Прогресс ----------
