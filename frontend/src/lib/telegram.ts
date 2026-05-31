@@ -21,6 +21,15 @@ export function getTelegramUser() {
   return { id: 99000001, username: 'dev_user' }
 }
 
+// Платформа Telegram: "android" | "ios" | "tdesktop" | "weba" | "unknown" и т.п.
+export function getTelegramPlatform(): string {
+  try {
+    return WebApp.platform ?? 'unknown'
+  } catch {
+    return 'unknown'
+  }
+}
+
 export function getColorScheme(): 'light' | 'dark' {
   try {
     return WebApp.colorScheme ?? 'light'

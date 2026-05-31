@@ -1,10 +1,11 @@
-// Сканирование еды по фото: выбор/съёмка фото → отправка на /api/analyze/photo
+// Сканирование еды по фото: камера/галерея → отправка на /api/analyze/photo
 // → показ результата для подтверждения перед сохранением.
-import { useRef, useState } from 'react'
-import { Camera, ImagePlus, Loader2, RotateCcw } from 'lucide-react'
+import { useState } from 'react'
+import { Loader2, RotateCcw } from 'lucide-react'
 import { analyzePhoto } from '../api/client'
 import type { PhotoAnalysisResult } from '../types'
 import { useUIStore } from '../store/uiStore'
+import PhotoSourcePicker from '../components/PhotoSourcePicker'
 
 interface Props {
   // Вызывается с распознанными данными, когда пользователь подтверждает.
@@ -28,35 +29,24 @@ function fileToBase64(file: File): Promise<{ base64: string; mime: string }> {
 }
 
 export default function ScanFood({ onConfirm, onManual }: Props) {
-  // Два отдельных input: камера (capture) и галерея (без capture).
-  const cameraInputRef = useRef<HTMLInputElement>(null)
-  const galleryInputRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<PhotoAnalysisResult | null>(null)
   const { showToast } = useUIStore()
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    // Сброс value — чтобы можно было выбрать то же фото повторно.
-    e.target.value = ''
-    if (!file) return
-
+  // Обработка выбранного/снятого фото (из камеры или галереи).
+  async function handlePhoto(file: File) {
     setPreview(URL.createObjectURL(file))
     setResult(null)
     setLoading(true)
     try {
       const { base64, mime } = await fileToBase64(file)
-      // Диагностика: размеры фото в консоли браузера.
-      console.log('Photo size:', file.size, 'bytes')
-      console.log('Base64 length:', base64.length)
-      console.log('MIME type:', mime)
+      console.log('Photo size:', file.size, 'bytes, mime:', mime)
 
       const res = await analyzePhoto(base64, mime)
       console.log('Analysis response:', res)
 
       if (res.error) {
-        // Еда не распознана / ошибка модели — предлагаем ручной ввод.
         showToast(
           'Не удалось распознать еду. Попробуй ближе и при хорошем освещении.',
           'error',
@@ -79,50 +69,12 @@ export default function ScanFood({ onConfirm, onManual }: Props) {
   function reset() {
     setPreview(null)
     setResult(null)
-    if (cameraInputRef.current) cameraInputRef.current.value = ''
-    if (galleryInputRef.current) galleryInputRef.current.value = ''
   }
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Input для камеры — capture открывает заднюю камеру */}
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={handleFile}
-      />
-      {/* Input для галереи — без capture */}
-      <input
-        ref={galleryInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleFile}
-      />
-
-      {!preview && (
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => cameraInputRef.current?.click()}
-            className="flex flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-ink/15 bg-card py-10 text-muted"
-          >
-            <Camera size={32} className="text-ink" />
-            <span className="text-sm font-semibold text-ink">Сфотографировать</span>
-            <span className="text-xs">Открыть камеру</span>
-          </button>
-          <button
-            onClick={() => galleryInputRef.current?.click()}
-            className="flex flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-ink/15 bg-card py-10 text-muted"
-          >
-            <ImagePlus size={32} className="text-ink" />
-            <span className="text-sm font-semibold text-ink">Из галереи</span>
-            <span className="text-xs">Выбрать фото</span>
-          </button>
-        </div>
-      )}
+      {/* Выбор источника: камера / галерея */}
+      {!preview && <PhotoSourcePicker onPhoto={handlePhoto} disabled={loading} />}
 
       {preview && (
         <div className="overflow-hidden rounded-3xl">
