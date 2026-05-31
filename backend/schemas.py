@@ -45,10 +45,23 @@ class UserOut(BaseModel):
     daily_protein_g: Optional[int]
     daily_fat_g: Optional[int]
     daily_carbs_g: Optional[int]
+    daily_water_ml: Optional[int] = 2000
     created_at: datetime
+
+    # Вычисляемые поля (не хранятся в БД, добавляются в роуте).
+    bmr: Optional[int] = None
+    tdee: Optional[int] = None
+    bmi: Optional[float] = None
+    bmi_category: Optional[str] = None
+    notes: Optional[List[str]] = None
 
     class Config:
         from_attributes = True
+
+
+class WaterGoalUpdate(BaseModel):
+    """Ручная установка дневной нормы воды (мл)."""
+    ml: int
 
 
 # ---------- Питание ----------

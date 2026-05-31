@@ -25,7 +25,14 @@ export interface User {
   daily_protein_g: number | null
   daily_fat_g: number | null
   daily_carbs_g: number | null
+  daily_water_ml: number | null
   created_at: string
+  // Вычисляемые поля (приходят с бэкенда, в БД не хранятся).
+  bmr?: number | null
+  tdee?: number | null
+  bmi?: number | null
+  bmi_category?: string | null
+  notes?: string[] | null
 }
 
 export interface FoodEntry {

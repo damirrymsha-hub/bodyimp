@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 import models
-from services.nutrition_calc import calculate_targets
+from services.nutrition_calc import calculate_nutrition
 
 router = APIRouter(prefix="/api/goals", tags=["goals"])
 
@@ -27,9 +27,7 @@ def get_goals(telegram_id: int, db: Session = Depends(get_db)):
         "daily_protein_g": user.daily_protein_g,
         "daily_fat_g": user.daily_fat_g,
         "daily_carbs_g": user.daily_carbs_g,
-        # Дополнительные фиксированные цели приложения.
-        "daily_water_ml": 2000,
-        "daily_steps": 10000,
+        "daily_water_ml": user.daily_water_ml or 2000,
     }
 
 
@@ -51,7 +49,7 @@ def recalculate_goals(telegram_id: int, db: Session = Depends(get_db)):
             status_code=400, detail="Недостаточно данных профиля для расчёта"
         )
 
-    targets = calculate_targets(
+    result = calculate_nutrition(
         gender=user.gender,
         weight_kg=user.weight_kg,
         height_cm=user.height_cm,
@@ -59,9 +57,17 @@ def recalculate_goals(telegram_id: int, db: Session = Depends(get_db)):
         activity_level=user.activity_level,
         goal=user.goal,
     )
-    user.daily_calories = targets["daily_calories"]
-    user.daily_protein_g = targets["daily_protein_g"]
-    user.daily_fat_g = targets["daily_fat_g"]
-    user.daily_carbs_g = targets["daily_carbs_g"]
+    user.daily_calories = result.target_calories
+    user.daily_protein_g = result.protein_g
+    user.daily_fat_g = result.fat_g
+    user.daily_carbs_g = result.carbs_g
+    if not user.water_goal_custom:
+        user.daily_water_ml = result.water_ml
     db.commit()
-    return targets
+    return {
+        "daily_calories": result.target_calories,
+        "daily_protein_g": result.protein_g,
+        "daily_fat_g": result.fat_g,
+        "daily_carbs_g": result.carbs_g,
+        "daily_water_ml": user.daily_water_ml,
+    }

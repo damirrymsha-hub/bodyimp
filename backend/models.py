@@ -9,6 +9,7 @@ from sqlalchemy import (
     Integer,
     String,
     Float,
+    Boolean,
     Date,
     DateTime,
     ForeignKey,
@@ -40,6 +41,10 @@ class User(Base):
     daily_protein_g = Column(Integer, nullable=True)
     daily_fat_g = Column(Integer, nullable=True)
     daily_carbs_g = Column(Integer, nullable=True)
+
+    # Норма воды: рассчитывается автоматически, но пользователь может задать вручную.
+    daily_water_ml = Column(Integer, default=2000)
+    water_goal_custom = Column(Boolean, default=False)
 
     created_at = Column(DateTime, default=datetime.utcnow)
 

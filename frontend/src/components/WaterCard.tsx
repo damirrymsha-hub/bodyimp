@@ -6,12 +6,11 @@ import { useUserStore } from '../store/userStore'
 import { haptic } from '../lib/telegram'
 import WaterModal from './WaterModal'
 
-const GOAL_ML = 2000
-
 export default function WaterCard() {
-  const { waterMl } = useUserStore()
+  const { waterMl, user } = useUserStore()
   const [showModal, setShowModal] = useState(false)
-  const pct = Math.min((waterMl / GOAL_ML) * 100, 100)
+  const goalMl = user?.daily_water_ml ?? 2000
+  const pct = Math.min((waterMl / goalMl) * 100, 100)
 
   return (
     <div className="flex-1 rounded-3xl bg-card p-4 shadow-card">
@@ -33,7 +32,9 @@ export default function WaterCard() {
       </div>
       <div className="text-2xl font-extrabold leading-none">
         {(waterMl / 1000).toFixed(1)}
-        <span className="ml-1 text-sm font-medium text-muted">/ 2 л</span>
+        <span className="ml-1 text-sm font-medium text-muted">
+          / {(goalMl / 1000).toFixed(1)} л
+        </span>
       </div>
       <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-ink/5">
         <div

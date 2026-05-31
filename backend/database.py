@@ -42,21 +42,28 @@ def _ensure_columns():
 
     from sqlalchemy import text
 
-    # Колонка -> SQL-определение для food_entries.
-    food_columns = {
-        "base_per_100g": "INTEGER DEFAULT 0",
-        "portion_size_g": "FLOAT",
+    # Таблица -> {колонка: SQL-определение}. Досоздаём недостающие колонки.
+    migrations = {
+        "food_entries": {
+            "base_per_100g": "INTEGER DEFAULT 0",
+            "portion_size_g": "FLOAT",
+        },
+        "users": {
+            "daily_water_ml": "INTEGER DEFAULT 2000",
+            "water_goal_custom": "INTEGER DEFAULT 0",
+        },
     }
     with engine.begin() as conn:
-        existing = {
-            row[1]
-            for row in conn.execute(text("PRAGMA table_info(food_entries)"))
-        }
-        for col, ddl in food_columns.items():
-            if col not in existing:
-                conn.execute(
-                    text(f"ALTER TABLE food_entries ADD COLUMN {col} {ddl}")
-                )
+        for table, columns in migrations.items():
+            existing = {
+                row[1]
+                for row in conn.execute(text(f"PRAGMA table_info({table})"))
+            }
+            for col, ddl in columns.items():
+                if col not in existing:
+                    conn.execute(
+                        text(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
+                    )
 
 
 def init_db():

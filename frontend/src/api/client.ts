@@ -48,6 +48,15 @@ export async function getUser(telegramId: number): Promise<User> {
   return data
 }
 
+// Ручная установка дневной нормы воды (500–5000 мл).
+export async function updateWaterGoal(
+  telegramId: number,
+  ml: number,
+): Promise<User> {
+  const { data } = await api.put<User>(`/api/users/${telegramId}/water-goal`, { ml })
+  return data
+}
+
 export async function updateUser(
   telegramId: number,
   payload: Partial<RegisterPayload>,

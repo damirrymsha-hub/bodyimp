@@ -18,9 +18,9 @@ const ACTIVITIES: { value: ActivityLevel; label: string; desc: string }[] = [
 ]
 
 const GOALS: { value: Goal; label: string; desc: string }[] = [
-  { value: 'lose', label: 'Похудеть', desc: 'Дефицит 500 ккал' },
+  { value: 'lose', label: 'Похудеть', desc: 'Снижение веса' },
   { value: 'maintain', label: 'Поддерживать', desc: 'Текущий вес' },
-  { value: 'gain', label: 'Набрать массу', desc: 'Профицит 500 ккал' },
+  { value: 'gain', label: 'Набрать массу', desc: 'Рост мышечной массы' },
 ]
 
 export default function Onboarding() {
@@ -173,7 +173,7 @@ export default function Onboarding() {
 
           {/* Шаг 4 — итог */}
           {step === 4 && result && (
-            <Step title="Ваша дневная норма">
+            <Step title="Твоя персональная норма">
               <div className="rounded-3xl bg-card p-6 text-center shadow-card">
                 <div className="text-5xl font-extrabold">{result.daily_calories}</div>
                 <div className="mt-1 text-sm text-muted">ккал в день</div>
@@ -183,6 +183,38 @@ export default function Onboarding() {
                   <Macro label="Углев." value={result.daily_carbs_g} color="text-carbs" />
                 </div>
               </div>
+
+              {/* ИМТ + детали расчёта */}
+              {result.bmi != null && (
+                <div className="mt-3 rounded-3xl bg-card p-4 text-sm shadow-card">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted">ИМТ</span>
+                    <span className="font-semibold">
+                      {result.bmi} — {result.bmi_category}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-muted">Базовый обмен (BMR)</span>
+                    <span className="font-semibold">{result.bmr} ккал</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-muted">С активностью (TDEE)</span>
+                    <span className="font-semibold">{result.tdee} ккал</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-muted">💧 Норма воды</span>
+                    <span className="font-semibold">{result.daily_water_ml} мл</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Пояснения системы */}
+              {result.notes?.map((n, i) => (
+                <p key={i} className="mt-2 text-center text-xs text-muted">
+                  {n}
+                </p>
+              ))}
+
               <p className="mt-4 text-center text-xs text-muted">
                 Норму можно изменить в профиле в любой момент.
               </p>
