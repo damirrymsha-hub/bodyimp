@@ -9,7 +9,7 @@ import asyncio
 import contextlib
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db
@@ -101,6 +101,37 @@ def auth_verify(x_init_data: str = Header(default="")):
 # ---------- Жизненный цикл: БД + бот ----------
 _bot_app = None  # ссылка на Application бота
 
+# Базовый публичный URL бэкенда для webhook-режима бота.
+# На Render переменная RENDER_EXTERNAL_URL выставляется автоматически.
+WEBHOOK_BASE = (
+    os.getenv("WEBHOOK_BASE_URL") or os.getenv("RENDER_EXTERNAL_URL") or ""
+).rstrip("/")
+# Секрет для проверки, что запросы на webhook приходят именно от Telegram.
+WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
+
+
+@app.post("/api/bot/webhook")
+async def bot_webhook(request: Request):
+    """
+    Принимает обновления от Telegram в webhook-режиме.
+    Нужен на хостингах со «сном» (Render free): входящее сообщение
+    само будит сервис, long-polling там работать не может.
+    """
+    if _bot_app is None:
+        raise HTTPException(status_code=503, detail="Бот не запущен")
+    # Проверка секретного токена Telegram (заголовок ставит сам Telegram).
+    if WEBHOOK_SECRET:
+        header = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+        if header != WEBHOOK_SECRET:
+            raise HTTPException(status_code=403, detail="Неверный секрет")
+
+    from telegram import Update
+
+    data = await request.json()
+    update = Update.de_json(data, _bot_app.bot)
+    await _bot_app.process_update(update)
+    return {"ok": True}
+
 
 @app.on_event("startup")
 async def on_startup():
@@ -119,9 +150,19 @@ async def on_startup():
             _bot_app = build_application()
             await _bot_app.initialize()
             await _bot_app.start()
-            # Запускаем polling без блокировки event loop FastAPI.
-            await _bot_app.updater.start_polling(drop_pending_updates=True)
-            print("Telegram-бот запущен.")
+            if WEBHOOK_BASE:
+                # Webhook-режим: Telegram шлёт обновления HTTP-запросом
+                # и тем самым будит «уснувший» бесплатный инстанс.
+                await _bot_app.bot.set_webhook(
+                    url=f"{WEBHOOK_BASE}/api/bot/webhook",
+                    secret_token=WEBHOOK_SECRET or None,
+                    drop_pending_updates=True,
+                )
+                print(f"Telegram-бот запущен (webhook: {WEBHOOK_BASE}).")
+            else:
+                # Локальная разработка — обычный polling.
+                await _bot_app.updater.start_polling(drop_pending_updates=True)
+                print("Telegram-бот запущен (polling).")
         except Exception as exc:  # noqa: BLE001
             _bot_app = None
             print(f"[WARN] Не удалось запустить Telegram-бота: {exc}. API работает без бота.")
@@ -132,7 +173,11 @@ async def on_shutdown():
     """Корректно останавливает бота при завершении приложения."""
     global _bot_app
     if _bot_app is not None:
+        # Раздельный suppress: в webhook-режиме updater не запускался,
+        # его stop() бросит исключение — не должен мешать остальной очистке.
         with contextlib.suppress(Exception):
             await _bot_app.updater.stop()
+        with contextlib.suppress(Exception):
             await _bot_app.stop()
+        with contextlib.suppress(Exception):
             await _bot_app.shutdown()

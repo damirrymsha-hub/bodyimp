@@ -1,0 +1,28 @@
+# Blueprint для Render: бэкенд BodyImp на бесплатном тарифе.
+# База — внешний бесплатный Postgres (Neon), DATABASE_URL задаётся вручную.
+services:
+  - type: web
+    name: bodyimp-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: ENV
+        value: production
+      - key: APP_NAME
+        value: BodyImp
+      # Эти значения задаются в дашборде Render (секреты не храним в git):
+      - key: DATABASE_URL
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false

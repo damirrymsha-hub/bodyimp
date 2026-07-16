@@ -13,10 +13,16 @@ load_dotenv()
 # Строка подключения. По умолчанию — локальный файл SQLite.
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./bodyimp.db")
 
+# Neon/Heroku выдают URL вида postgres://, а SQLAlchemy 2.x требует postgresql://
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 # Для SQLite нужно отключить проверку потока (FastAPI работает в нескольких потоках).
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
+# pool_pre_ping — для serverless-Postgres (Neon): соединения могут «протухать»
+# после простоя, пинг перед использованием пересоздаёт их автоматически.
+engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Базовый класс для всех ORM-моделей.
