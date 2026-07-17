@@ -7,7 +7,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 
 import schemas
-from services.openrouter_service import analyze_food_photo
+from services.openrouter_service import analyze_food_photo, analyze_food_text
 
 logger = logging.getLogger(__name__)
 
@@ -50,4 +50,41 @@ async def analyze_photo(payload: schemas.PhotoAnalyzeRequest):
         raise HTTPException(500, str(e))
     except Exception as e:  # noqa: BLE001
         logger.error(f"Analysis failed: {type(e).__name__}: {e}")
+        raise HTTPException(500, f"Ошибка анализа: {str(e)}")
+
+
+@router.post("/text")
+async def analyze_text(payload: schemas.TextAnalyzeRequest):
+    """
+    Принимает текстовое описание еды («2 яйца и тост с маслом»),
+    возвращает оценку КБЖУ в том же формате, что и анализ фото:
+      - успех:   {"success": True, "data": {...}}
+      - не еда:  {"success": False, "error": "no_food", "message": "..."}
+    """
+    try:
+        description = (payload.description or "").strip()
+        logger.debug(f"Received text description, length: {len(description)}")
+
+        if len(description) < 3:
+            raise HTTPException(400, "Опиши, что ты съел — хотя бы пару слов")
+        if len(description) > 1000:
+            raise HTTPException(400, "Слишком длинное описание (максимум 1000 символов)")
+
+        result = await analyze_food_text(description)
+
+        if "error" in result:
+            return {
+                "success": False,
+                "error": "no_food",
+                "message": "Не удалось распознать еду в описании",
+            }
+        return {"success": True, "data": result}
+
+    except HTTPException:
+        raise
+    except ValueError as e:
+        logger.error(f"Config error: {e}")
+        raise HTTPException(500, str(e))
+    except Exception as e:  # noqa: BLE001
+        logger.error(f"Text analysis failed: {type(e).__name__}: {e}")
         raise HTTPException(500, f"Ошибка анализа: {str(e)}")

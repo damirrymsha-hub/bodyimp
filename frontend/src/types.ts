@@ -9,7 +9,7 @@ export type ActivityLevel =
   | 'active'
   | 'very_active'
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
-export type FoodSource = 'manual' | 'photo' | 'scan'
+export type FoodSource = 'manual' | 'photo' | 'scan' | 'text'
 
 export interface User {
   id: number

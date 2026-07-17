@@ -146,6 +146,17 @@ export async function analyzePhoto(
   return { error: data.error ?? 'no_food', detail: data.message }
 }
 
+// Анализ текстового описания еды («2 яйца и тост») — тот же формат ответа.
+export async function analyzeText(
+  description: string,
+): Promise<PhotoAnalysisResult> {
+  const { data } = await api.post<PhotoAnalyzeResponse>('/api/analyze/text', {
+    description,
+  })
+  if (data.success && data.data) return data.data
+  return { error: data.error ?? 'no_food', detail: data.message }
+}
+
 // ---------- Вода ----------
 export async function addWater(
   userId: number,

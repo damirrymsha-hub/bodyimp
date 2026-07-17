@@ -257,3 +257,114 @@ async def analyze_food_photo(image_base64: str, mime_type: str = "image/jpeg") -
 
     logger.error(f"All models failed. Last error: {last_error}")
     raise Exception(f"Все модели недоступны. Последняя ошибка: {last_error}")
+
+
+FOOD_TEXT_SYSTEM_PROMPT = """You are a nutrition analyst. The user describes food they ate in natural language (usually Russian), possibly with quantities (e.g. "2 яйца и тост с маслом", "тарелка борща со сметаной").
+Estimate the TOTAL nutrition for everything described and respond ONLY with a JSON object in this exact format, no markdown, no explanation:
+{
+  "name": "short summary of the food in Russian",
+  "portion_g": 300,
+  "calories": 450,
+  "protein_g": 25,
+  "fat_g": 15,
+  "carbs_g": 50,
+  "confidence": "high",
+  "items": ["позиция 1", "позиция 2"]
+}
+Use realistic average values. If quantities are not specified, assume typical portions.
+If the text does not describe any food or drink, respond with: {"error": "no_food"}
+Respond ONLY with the JSON object."""
+
+
+async def analyze_food_text(description: str) -> dict:
+    """
+    Оценивает КБЖУ по текстовому описанию еды (тот же формат ответа, что и фото).
+    Перебирает те же бесплатные модели; при недоступности всех — Exception.
+    """
+    if not OPENROUTER_API_KEY:
+        logger.error("OPENROUTER_API_KEY not set!")
+        raise ValueError("OPENROUTER_API_KEY не задан в .env")
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://bodyimp.app",
+        "X-Title": "BodyImp",
+    }
+
+    last_error = None
+    for model in VISION_MODELS:  # эти модели отлично работают и с чистым текстом
+        logger.debug(f"Text analysis, trying model: {model}")
+        content = ""
+        try:
+            payload = {
+                "model": model,
+                "max_tokens": 800,
+                "temperature": 0.1,
+                "messages": [
+                    {"role": "system", "content": FOOD_TEXT_SYSTEM_PROMPT},
+                    {"role": "user", "content": description.strip()},
+                ],
+            }
+
+            async with httpx.AsyncClient(timeout=45.0) as client:
+                response = await client.post(
+                    f"{OPENROUTER_BASE_URL}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                )
+                logger.debug(f"Text response status: {response.status_code}")
+
+                if response.status_code == 429:
+                    last_error = "rate_limit"
+                    continue
+                response.raise_for_status()
+                data = response.json()
+
+                choices = data.get("choices", [])
+                if not choices:
+                    continue
+                content = choices[0].get("message", {}).get("content", "")
+                if not content:
+                    continue
+
+                # Очистка от markdown и поиск JSON — та же логика, что для фото.
+                content = content.strip()
+                if "```" in content:
+                    for part in content.split("```"):
+                        part = part.strip()
+                        if part.startswith("json"):
+                            part = part[4:].strip()
+                        if part.startswith("{"):
+                            content = part
+                            break
+                if not content.startswith("{"):
+                    m = re.search(r"\{.*\}", content, re.DOTALL)
+                    if not m:
+                        continue
+                    content = m.group(0)
+
+                result = _loads_salvage(content)
+                logger.info(f"Text analysis result from {model}: {result}")
+
+                if "error" in result:
+                    return result
+                required = ["name", "calories", "protein_g", "fat_g", "carbs_g"]
+                if all(k in result for k in required):
+                    return result
+                continue
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Text JSON parse error for {model}: {e}")
+            last_error = str(e)
+            continue
+        except httpx.TimeoutException:
+            last_error = "timeout"
+            continue
+        except Exception as e:  # noqa: BLE001
+            logger.error(f"Text analysis error with {model}: {type(e).__name__}: {e}")
+            last_error = str(e)
+            continue
+
+    logger.error(f"All models failed for text analysis. Last error: {last_error}")
+    raise Exception(f"Все модели недоступны. Последняя ошибка: {last_error}")

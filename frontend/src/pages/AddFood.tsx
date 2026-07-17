@@ -3,7 +3,7 @@
 // Если передан editingEntry — окно открывается сразу в режиме правки.
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { X, PencilLine, Camera, Search, Star, Trash2 } from 'lucide-react'
+import { X, PencilLine, Camera, Search, Sparkles, Star, Trash2 } from 'lucide-react'
 import { z } from 'zod'
 import { useUserStore } from '../store/userStore'
 import { useUIStore } from '../store/uiStore'
@@ -12,8 +12,9 @@ import type { MealType, PhotoAnalysisResult, FoodEntry } from '../types'
 import ScanFood from './ScanFood'
 import SearchTab from '../components/SearchTab'
 import FavoritesTab from '../components/FavoritesTab'
+import DescribeFood from '../components/DescribeFood'
 
-type Mode = 'menu' | 'manual' | 'photo' | 'search' | 'favorites'
+type Mode = 'menu' | 'manual' | 'photo' | 'search' | 'favorites' | 'text'
 type UnitMode = 'portion' | 'per100'
 
 const MEALS: { value: MealType; label: string }[] = [
@@ -133,7 +134,7 @@ export default function AddFood({ onClose, editingEntry }: Props) {
     protein_g: number
     fat_g: number
     carbs_g: number
-    source: 'manual' | 'photo' | 'scan'
+    source: 'manual' | 'photo' | 'scan' | 'text'
   }) {
     await addFood({ ...payload, meal_type: meal })
     hapticSuccess()
@@ -149,6 +150,18 @@ export default function AddFood({ onClose, editingEntry }: Props) {
       fat_g: r.fat_g ?? 0,
       carbs_g: r.carbs_g ?? 0,
       source: 'photo',
+    })
+  }
+
+  // Подтверждение результата текстового описания — калории уходят в дневной итог.
+  function handleTextConfirm(r: PhotoAnalysisResult) {
+    saveAndClose({
+      name: r.name ?? 'Блюдо по описанию',
+      calories: r.calories ?? 0,
+      protein_g: r.protein_g ?? 0,
+      fat_g: r.fat_g ?? 0,
+      carbs_g: r.carbs_g ?? 0,
+      source: 'text',
     })
   }
 
@@ -174,7 +187,9 @@ export default function AddFood({ onClose, editingEntry }: Props) {
                     ? 'Сфотографировать'
                     : mode === 'favorites'
                       ? 'Избранное'
-                      : 'Быстрый поиск'}
+                      : mode === 'text'
+                        ? 'Описать текстом'
+                        : 'Быстрый поиск'}
           </h2>
           <button
             onClick={() =>
@@ -222,6 +237,15 @@ export default function AddFood({ onClose, editingEntry }: Props) {
               onClick={() => {
                 haptic('light')
                 setMode('photo')
+              }}
+            />
+            <ModeButton
+              icon={<Sparkles size={22} />}
+              title="Описать текстом"
+              subtitle="ИИ посчитает КБЖУ по описанию"
+              onClick={() => {
+                haptic('light')
+                setMode('text')
               }}
             />
             <ModeButton
@@ -391,6 +415,14 @@ export default function AddFood({ onClose, editingEntry }: Props) {
         {/* Фото */}
         {mode === 'photo' && (
           <ScanFood onConfirm={handlePhotoConfirm} onManual={() => setMode('manual')} />
+        )}
+
+        {/* Описание еды текстом — ИИ считает КБЖУ */}
+        {mode === 'text' && (
+          <DescribeFood
+            onConfirm={handleTextConfirm}
+            onManual={() => setMode('manual')}
+          />
         )}
 
         {/* Быстрый поиск по базе продуктов */}

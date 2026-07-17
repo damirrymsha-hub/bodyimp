@@ -116,6 +116,11 @@ class PhotoAnalyzeRequest(BaseModel):
     mime_type: str = "image/jpeg"
 
 
+# ---------- Анализ текстового описания еды ----------
+class TextAnalyzeRequest(BaseModel):
+    description: str
+
+
 # ---------- Вода ----------
 class WaterAdd(BaseModel):
     user_id: int
