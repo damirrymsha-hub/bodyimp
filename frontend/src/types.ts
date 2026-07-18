@@ -121,6 +121,9 @@ export interface PhotoAnalysisResult {
 export interface WeeklyStats {
   days: { date: string; calories: number }[]
   avg_calories: number
+  avg_protein_g?: number
+  avg_fat_g?: number
+  avg_carbs_g?: number
 }
 
 export interface WeightLog {

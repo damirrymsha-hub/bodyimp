@@ -1,5 +1,6 @@
-// Элемент списка еды за день: название, тип приёма, ккал, ⭐ избранное + удаление.
-import { Trash2, Star } from 'lucide-react'
+// Строка еды (редизайн 1a): название + мета, ккал числом, ⭐ избранное.
+// Тап по строке — редактирование (там же и удаление записи).
+import { Star } from 'lucide-react'
 import type { FoodEntry, MealType } from '../types'
 import { haptic } from '../lib/telegram'
 import { useUserStore } from '../store/userStore'
@@ -13,11 +14,10 @@ const MEAL_LABELS: Record<MealType, string> = {
 
 interface Props {
   entry: FoodEntry
-  onDelete: (id: number) => void
   onEdit: (entry: FoodEntry) => void
 }
 
-export default function FoodItem({ entry, onDelete, onEdit }: Props) {
+export default function FoodItem({ entry, onEdit }: Props) {
   const { isFavorite, favoriteByName, addFavorite, removeFavorite } = useUserStore()
   const fav = isFavorite(entry.name)
 
@@ -42,7 +42,6 @@ export default function FoodItem({ entry, onDelete, onEdit }: Props) {
   }
 
   return (
-    // Клик по строке открывает форму редактирования.
     <div
       onClick={() => {
         haptic('light')
@@ -52,37 +51,22 @@ export default function FoodItem({ entry, onDelete, onEdit }: Props) {
     >
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-semibold text-ink">{entry.name}</div>
-        <div className="mt-0.5 text-xs text-muted">
+        <div className="mt-0.5 text-[11px] font-medium text-muted">
           {MEAL_LABELS[entry.meal_type]} · Б {Math.round(entry.protein_g)} · Ж{' '}
           {Math.round(entry.fat_g)} · У {Math.round(entry.carbs_g)}
         </div>
       </div>
-      <div className="text-right">
-        <div className="text-sm font-bold">{Math.round(entry.calories)}</div>
-        <div className="text-[10px] text-muted">ккал</div>
-      </div>
-      {/* Избранное */}
+      <div className="text-sm font-bold">{Math.round(entry.calories)}</div>
       <button
         onClick={toggleFav}
-        className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-ink/5"
+        className="flex h-8 w-8 items-center justify-center rounded-full"
         aria-label="В избранное"
       >
         <Star
           size={16}
-          className={fav ? 'text-yellow-400' : 'text-muted'}
+          className={fav ? 'text-yellow-400' : 'text-ink/20'}
           fill={fav ? 'currentColor' : 'none'}
         />
-      </button>
-      <button
-        onClick={(e) => {
-          e.stopPropagation() // не открывать редактирование при быстром удалении
-          haptic('light')
-          onDelete(entry.id)
-        }}
-        className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-ink/5"
-        aria-label="Удалить"
-      >
-        <Trash2 size={16} />
       </button>
     </div>
   )

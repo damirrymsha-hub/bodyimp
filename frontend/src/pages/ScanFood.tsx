@@ -1,12 +1,11 @@
-// Сканирование еды по фото: камера/галерея → отправка на /api/analyze/photo
-// → показ результата для подтверждения перед сохранением.
-import { useState } from 'react'
-import { Loader2 } from 'lucide-react'
+// Сканирование еды по фото (редизайн 1c): скелетон-загрузка, карточка ошибки
+// с повтором того же снимка, результат с правкой перед сохранением.
+import { useRef, useState } from 'react'
 import { analyzePhoto } from '../api/client'
 import type { PhotoAnalysisResult } from '../types'
-import { useUIStore } from '../store/uiStore'
 import PhotoSourcePicker from '../components/PhotoSourcePicker'
 import AnalysisResultCard from '../components/AnalysisResultCard'
+import AnalysisSkeleton, { AnalysisError } from '../components/AnalysisSkeleton'
 
 interface Props {
   // Вызывается с распознанными данными, когда пользователь подтверждает.
@@ -32,44 +31,42 @@ function fileToBase64(file: File): Promise<{ base64: string; mime: string }> {
 export default function ScanFood({ onConfirm, onManual }: Props) {
   const [preview, setPreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [failed, setFailed] = useState(false)
   const [result, setResult] = useState<PhotoAnalysisResult | null>(null)
-  const { showToast } = useUIStore()
+  // Последний снимок — для «Повторить» без пересъёмки.
+  const lastFileRef = useRef<File | null>(null)
 
-  // Обработка выбранного/снятого фото (из камеры или галереи).
   async function handlePhoto(file: File) {
+    lastFileRef.current = file
     setPreview(URL.createObjectURL(file))
     setResult(null)
+    setFailed(false)
     setLoading(true)
     try {
       const { base64, mime } = await fileToBase64(file)
-      console.log('Photo size:', file.size, 'bytes, mime:', mime)
-
       const res = await analyzePhoto(base64, mime)
-      console.log('Analysis response:', res)
-
       if (res.error) {
-        showToast(
-          'Не удалось распознать еду. Попробуй ближе и при хорошем освещении.',
-          'error',
-        )
-        onManual()
+        setFailed(true)
         return
       }
       setResult(res)
     } catch (err) {
       console.error('Photo analysis error:', err)
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || 'Ошибка анализа фото. Попробуйте ещё раз.'
-      showToast(msg, 'error')
+      setFailed(true)
     } finally {
       setLoading(false)
     }
   }
 
+  function retry() {
+    if (lastFileRef.current) handlePhoto(lastFileRef.current)
+  }
+
   function reset() {
     setPreview(null)
     setResult(null)
+    setFailed(false)
+    lastFileRef.current = null
   }
 
   return (
@@ -78,19 +75,28 @@ export default function ScanFood({ onConfirm, onManual }: Props) {
       {!preview && <PhotoSourcePicker onPhoto={handlePhoto} disabled={loading} />}
 
       {preview && (
-        <div className="overflow-hidden rounded-3xl">
-          <img src={preview} alt="Фото еды" className="h-48 w-full object-cover" />
-        </div>
+        <button
+          onClick={reset}
+          className="overflow-hidden rounded-3xl"
+          aria-label="Выбрать другое фото"
+        >
+          <img src={preview} alt="Фото еды" className="h-44 w-full object-cover" />
+        </button>
       )}
 
-      {loading && (
-        <div className="flex items-center justify-center gap-2 py-4 text-muted">
-          <Loader2 size={20} className="animate-spin" />
-          <span className="text-sm">Анализируем фото…</span>
-        </div>
+      {/* Скелетон анализа */}
+      {loading && <AnalysisSkeleton />}
+
+      {/* Ошибка: фото сохранено, можно повторить */}
+      {failed && !loading && (
+        <AnalysisError
+          subtitle="Фото сохранено — попробуйте ещё раз или введите вручную"
+          onRetry={retry}
+          onManual={onManual}
+        />
       )}
 
-      {/* Результат: можно поправить перед добавлением (правки → фидбек) */}
+      {/* Результат с правкой перед добавлением */}
       {result && !loading && (
         <AnalysisResultCard
           result={result}

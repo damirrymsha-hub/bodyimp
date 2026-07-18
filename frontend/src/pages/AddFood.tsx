@@ -230,63 +230,67 @@ export default function AddFood({ onClose, editingEntry }: Props) {
           </div>
         )}
 
-        {/* Меню выбора режима (не показываем при редактировании) */}
+        {/* Меню (редизайн 1b): 2 частых режима крупно + компактная сетка 2×2 */}
         {mode === 'menu' && (
-          <div className="flex flex-col gap-3">
-            <ModeButton
-              icon={<PencilLine size={22} />}
-              title="Ввести вручную"
-              subtitle="Название и КБЖУ"
-              onClick={() => {
-                haptic('light')
-                setMode('manual')
-              }}
-            />
-            <ModeButton
-              icon={<Camera size={22} />}
-              title="Сфотографировать"
-              subtitle="Анализ еды по фото (ИИ)"
-              onClick={() => {
-                haptic('light')
-                setMode('photo')
-              }}
-            />
-            <ModeButton
-              icon={<Sparkles size={22} />}
-              title="Описать текстом"
-              subtitle="ИИ посчитает КБЖУ по описанию"
-              onClick={() => {
-                haptic('light')
-                setMode('text')
-              }}
-            />
-            <ModeButton
-              icon={<Barcode size={22} />}
-              title="Штрихкод"
-              subtitle="Точные данные с упаковки"
-              onClick={() => {
-                haptic('light')
-                setMode('barcode')
-              }}
-            />
-            <ModeButton
-              icon={<Search size={22} />}
-              title="Быстрый поиск"
-              subtitle="База продуктов"
-              onClick={() => {
-                haptic('light')
-                setMode('search')
-              }}
-            />
-            <ModeButton
-              icon={<Star size={22} />}
-              title="Избранное"
-              subtitle="Сохранённые продукты"
-              onClick={() => {
-                haptic('light')
-                setMode('favorites')
-              }}
-            />
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <ModeButton
+                icon={<Camera size={20} />}
+                title="Сфотографировать"
+                subtitle="ИИ распознает блюдо и посчитает КБЖУ"
+                onClick={() => {
+                  haptic('light')
+                  setMode('photo')
+                }}
+              />
+              <ModeButton
+                icon={<Sparkles size={20} />}
+                title="Описать текстом"
+                subtitle="ИИ оценит КБЖУ по описанию"
+                onClick={() => {
+                  haptic('light')
+                  setMode('text')
+                }}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <GridModeButton
+                icon={<Search size={18} />}
+                title="Быстрый поиск"
+                subtitle="База продуктов"
+                onClick={() => {
+                  haptic('light')
+                  setMode('search')
+                }}
+              />
+              <GridModeButton
+                icon={<Barcode size={18} />}
+                title="Штрихкод"
+                subtitle="Скан упаковки"
+                onClick={() => {
+                  haptic('light')
+                  setMode('barcode')
+                }}
+              />
+              <GridModeButton
+                icon={<PencilLine size={18} />}
+                title="Вручную"
+                subtitle="Своё КБЖУ"
+                onClick={() => {
+                  haptic('light')
+                  setMode('manual')
+                }}
+              />
+              <GridModeButton
+                icon={<Star size={18} className="text-yellow-400" fill="currentColor" />}
+                title="Избранное"
+                subtitle="Частые блюда"
+                onClick={() => {
+                  haptic('light')
+                  setMode('favorites')
+                }}
+              />
+            </div>
           </div>
         )}
 
@@ -475,14 +479,43 @@ function ModeButton({
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-4 rounded-3xl bg-card p-4 text-left shadow-card"
+      className="flex items-center gap-3.5 rounded-3xl bg-card p-4 text-left shadow-card active:bg-ink/[0.03]"
     >
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-ink/5 text-ink">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-ink/5 text-ink">
+        {icon}
+      </div>
+      <div className="flex-1">
+        <div className="text-sm font-semibold">{title}</div>
+        <div className="mt-0.5 text-[11px] font-medium text-muted">{subtitle}</div>
+      </div>
+      <span className="text-base text-muted">›</span>
+    </button>
+  )
+}
+
+// Компактная плитка сетки 2×2 (редизайн 1b).
+function GridModeButton({
+  icon,
+  title,
+  subtitle,
+  onClick,
+}: {
+  icon: React.ReactNode
+  title: string
+  subtitle: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex flex-col gap-2.5 rounded-3xl bg-card p-4 text-left shadow-card active:bg-ink/[0.03]"
+    >
+      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-ink/5 text-ink">
         {icon}
       </div>
       <div>
-        <div className="text-sm font-semibold">{title}</div>
-        <div className="text-xs text-muted">{subtitle}</div>
+        <div className="text-[13px] font-semibold">{title}</div>
+        <div className="mt-0.5 text-[10px] font-medium text-muted">{subtitle}</div>
       </div>
     </button>
   )

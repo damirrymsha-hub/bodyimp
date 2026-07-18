@@ -226,3 +226,7 @@ class DailyCalories(BaseModel):
 class WeeklyStats(BaseModel):
     days: List[DailyCalories]
     avg_calories: float
+    # Средние макросы за неделю (для экрана Прогресс).
+    avg_protein_g: float = 0
+    avg_fat_g: float = 0
+    avg_carbs_g: float = 0

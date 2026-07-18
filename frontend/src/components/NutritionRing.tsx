@@ -10,7 +10,7 @@ export default function NutritionRing({
   consumed,
   goal,
   size = 168,
-  stroke = 14,
+  stroke = 12,
 }: Props) {
   const radius = (size - stroke) / 2
   const circumference = 2 * Math.PI * radius

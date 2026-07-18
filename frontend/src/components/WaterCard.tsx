@@ -1,10 +1,14 @@
-// Карточка воды с прогрессом. Кнопка "+" открывает bottom-sheet модалку WaterModal.
+// Компактная карточка воды (редизайн 1a): заголовок + «+», крупное число, бар.
+// Кнопка "+" открывает bottom-sheet модалку WaterModal.
 import { useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
-import { Droplet, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useUserStore } from '../store/userStore'
 import { haptic } from '../lib/telegram'
 import WaterModal from './WaterModal'
+
+// Литры в русском формате: 1.2 → «1,2».
+const ru = (l: number) => l.toFixed(1).replace('.', ',')
 
 export default function WaterCard() {
   const { waterMl, user } = useUserStore()
@@ -13,12 +17,9 @@ export default function WaterCard() {
   const pct = Math.min((waterMl / goalMl) * 100, 100)
 
   return (
-    <div className="flex-1 rounded-3xl bg-card p-4 shadow-card">
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Droplet size={18} className="text-water" />
-          <span className="text-sm font-semibold">Вода</span>
-        </div>
+    <div className="flex flex-col gap-3 rounded-3xl bg-card p-4 shadow-card">
+      <div className="flex items-center justify-between">
+        <span className="text-[13px] font-semibold">Вода</span>
         <button
           onClick={() => {
             haptic('light')
@@ -30,13 +31,11 @@ export default function WaterCard() {
           <Plus size={16} />
         </button>
       </div>
-      <div className="text-2xl font-extrabold leading-none">
-        {(waterMl / 1000).toFixed(1)}
-        <span className="ml-1 text-sm font-medium text-muted">
-          / {(goalMl / 1000).toFixed(1)} л
-        </span>
+      <div className="flex items-baseline gap-1">
+        <span className="text-2xl font-extrabold leading-none">{ru(waterMl / 1000)}</span>
+        <span className="text-xs font-medium text-muted">/ {ru(goalMl / 1000)} л</span>
       </div>
-      <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-ink/5">
+      <div className="h-2 w-full overflow-hidden rounded-full bg-ink/5">
         <div
           className="h-full rounded-full bg-water"
           style={{ width: `${pct}%`, transition: 'width 0.5s ease' }}

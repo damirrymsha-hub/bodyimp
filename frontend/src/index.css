@@ -37,3 +37,16 @@ body {
     @apply w-full rounded-2xl bg-card px-4 py-3 text-sm font-medium text-ink shadow-card outline-none placeholder:text-muted/60 focus:ring-2 focus:ring-ink/10;
   }
 }
+
+/* Анимации скелетона ИИ-анализа (редизайн 1c) */
+@keyframes bi-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+@keyframes bi-dots {
+  0%, 20% { opacity: 0.2; }
+  40% { opacity: 1; }
+  100% { opacity: 0.2; }
+}
+.bi-pulse { animation: bi-pulse 1.4s ease-in-out infinite; }
+.bi-dot { animation: bi-dots 1.2s infinite; }

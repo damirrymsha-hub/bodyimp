@@ -1,17 +1,15 @@
-// Описание еды текстом: пользователь пишет, что съел («2 яйца и тост с маслом»),
-// ИИ оценивает КБЖУ → показываем результат для подтверждения перед сохранением.
+// Описание еды текстом (редизайн 1c): скелетон вместо спиннера,
+// ошибка — карточка с retry (ввод не теряется), результат — с правкой.
 import { useState } from 'react'
-import { Loader2, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import { analyzeText } from '../api/client'
 import type { PhotoAnalysisResult } from '../types'
-import { useUIStore } from '../store/uiStore'
 import { haptic } from '../lib/telegram'
 import AnalysisResultCard from './AnalysisResultCard'
+import AnalysisSkeleton, { AnalysisError } from './AnalysisSkeleton'
 
 interface Props {
-  // Вызывается с распознанными данными, когда пользователь подтверждает.
   onConfirm: (result: PhotoAnalysisResult) => void
-  // Переключиться на ручной ввод (если ИИ не справился).
   onManual: () => void
 }
 
@@ -24,44 +22,35 @@ const EXAMPLES = [
 export default function DescribeFood({ onConfirm, onManual }: Props) {
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
+  const [failed, setFailed] = useState(false)
   const [result, setResult] = useState<PhotoAnalysisResult | null>(null)
-  const { showToast } = useUIStore()
 
   async function analyze() {
     const description = text.trim()
-    if (description.length < 3) {
-      showToast('Опиши, что ты съел — хотя бы пару слов', 'error')
-      return
-    }
+    if (description.length < 3) return
     haptic('light')
     setLoading(true)
+    setFailed(false)
     setResult(null)
     try {
       const res = await analyzeText(description)
       if (res.error) {
-        showToast('Не удалось распознать еду. Попробуй уточнить описание.', 'error')
+        setFailed(true)
         return
       }
       setResult(res)
     } catch (err) {
       console.error('Text analysis error:', err)
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || 'Ошибка анализа. Попробуй ещё раз.'
-      showToast(msg, 'error')
+      setFailed(true)
     } finally {
       setLoading(false)
     }
   }
 
-  function reset() {
-    setResult(null)
-  }
-
   return (
     <div className="flex flex-col gap-4">
-      {/* Поле описания */}
-      {!result && (
+      {/* Поле описания (остаётся видимым при ошибке — ввод не теряется) */}
+      {!result && !loading && (
         <>
           <textarea
             value={text}
@@ -70,57 +59,60 @@ export default function DescribeFood({ onConfirm, onManual }: Props) {
             rows={3}
             maxLength={1000}
             className="input resize-none"
-            disabled={loading}
           />
 
-          {/* Примеры-подсказки */}
-          <div className="flex flex-wrap gap-2">
-            {EXAMPLES.map((ex) => (
-              <button
-                key={ex}
-                onClick={() => setText(ex)}
-                disabled={loading}
-                className="rounded-full bg-ink/5 px-3 py-1.5 text-xs text-muted"
-              >
-                {ex}
-              </button>
-            ))}
-          </div>
+          {!failed && (
+            <div className="flex flex-wrap gap-2">
+              {EXAMPLES.map((ex) => (
+                <button
+                  key={ex}
+                  onClick={() => setText(ex)}
+                  className="rounded-full bg-ink/5 px-3 py-1.5 text-xs text-muted"
+                >
+                  {ex}
+                </button>
+              ))}
+            </div>
+          )}
 
-          <button
-            onClick={analyze}
-            disabled={loading || text.trim().length < 3}
-            className="flex items-center justify-center gap-2 rounded-2xl bg-ink py-4 text-sm font-semibold text-white disabled:opacity-40"
-          >
-            {loading ? (
-              <>
-                <Loader2 size={18} className="animate-spin" /> Считаем КБЖУ…
-              </>
-            ) : (
-              <>
+          {failed ? (
+            <AnalysisError
+              subtitle="Текст сохранён — попробуйте ещё раз или введите вручную"
+              onRetry={analyze}
+              onManual={onManual}
+            />
+          ) : (
+            <>
+              <button
+                onClick={analyze}
+                disabled={text.trim().length < 3}
+                className="flex items-center justify-center gap-2 rounded-2xl bg-ink py-4 text-sm font-semibold text-white disabled:opacity-40"
+              >
                 <Sparkles size={18} /> Определить КБЖУ
-              </>
-            )}
-          </button>
+              </button>
+              <button
+                onClick={onManual}
+                className="text-center text-xs text-muted underline"
+              >
+                Ввести КБЖУ вручную
+              </button>
+            </>
+          )}
         </>
       )}
 
-      {/* Результат анализа: можно поправить перед добавлением (правки → фидбек) */}
+      {/* Скелетон анализа */}
+      {loading && <AnalysisSkeleton />}
+
+      {/* Результат с возможностью правки */}
       {result && !loading && (
         <AnalysisResultCard
           result={result}
           source="text"
           inputText={text.trim()}
           onConfirm={(final) => onConfirm(final)}
-          onRetry={reset}
+          onRetry={() => setResult(null)}
         />
-      )}
-
-      {/* Фолбэк на ручной ввод */}
-      {!result && (
-        <button onClick={onManual} className="text-center text-xs text-muted underline">
-          Ввести КБЖУ вручную
-        </button>
       )}
     </div>
   )

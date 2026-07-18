@@ -30,3 +30,14 @@ export function humanDate(iso: string): string {
   if (iso === todayISO()) return `Сегодня, ${dayMonth}`
   return `${WEEKDAYS_FULL[d.getDay()]}, ${dayMonth}`
 }
+
+// Части заголовка Home (редизайн 1a): маленькая строка — день недели,
+// большая — "Сегодня, 18 июля" либо просто "18 июля" для других дней.
+export function dayParts(iso: string): { weekday: string; label: string } {
+  const d = new Date(iso + 'T00:00:00')
+  const dayMonth = `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`
+  return {
+    weekday: WEEKDAYS_FULL[d.getDay()].toLowerCase(),
+    label: iso === todayISO() ? `Сегодня, ${dayMonth}` : dayMonth,
+  }
+}

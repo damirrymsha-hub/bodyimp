@@ -44,7 +44,28 @@ def weekly_stats(user_id: int, db: Session = Depends(get_db)):
 
     total = sum(day.calories for day in days)
     avg = round(total / 7, 1)
-    return schemas.WeeklyStats(days=days, avg_calories=avg)
+
+    # Средние макросы за те же 7 дней (для карточки на экране Прогресс).
+    macros = (
+        db.query(
+            func.coalesce(func.sum(models.FoodEntry.protein_g), 0),
+            func.coalesce(func.sum(models.FoodEntry.fat_g), 0),
+            func.coalesce(func.sum(models.FoodEntry.carbs_g), 0),
+        )
+        .filter(
+            models.FoodEntry.user_id == user_id,
+            models.FoodEntry.date >= start,
+            models.FoodEntry.date <= today,
+        )
+        .first()
+    )
+    return schemas.WeeklyStats(
+        days=days,
+        avg_calories=avg,
+        avg_protein_g=round(float(macros[0]) / 7, 1),
+        avg_fat_g=round(float(macros[1]) / 7, 1),
+        avg_carbs_g=round(float(macros[2]) / 7, 1),
+    )
 
 
 @router.post("/weight/log", response_model=schemas.WeightOut)

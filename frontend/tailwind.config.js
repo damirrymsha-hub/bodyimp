@@ -8,7 +8,9 @@ export default {
         bg: '#F6F7F9',
         card: '#FFFFFF',
         ink: '#1A1A1A',
-        muted: '#8A8F98',
+        // Редизайн 1f: подписи читаемы (AA 4.6:1); старый серый — только декор.
+        muted: '#6E7480',
+        faint: '#8A8F98',
         accent: '#111111',
         protein: '#FF7A59',
         fat: '#FFC24B',
