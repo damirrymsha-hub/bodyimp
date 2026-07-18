@@ -13,7 +13,10 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db
-from routes import user, food, analyze, water, stats, goals, activity, favorites, food_search
+from routes import (
+    user, food, analyze, water, stats, goals, activity,
+    favorites, food_search, barcode, feedback,
+)
 from services.telegram_auth import verify_init_data
 
 load_dotenv()
@@ -45,6 +48,8 @@ app.include_router(stats.router)
 app.include_router(goals.router)
 app.include_router(favorites.router)
 app.include_router(food_search.router)
+app.include_router(barcode.router)
+app.include_router(feedback.router)
 
 
 @app.get("/")

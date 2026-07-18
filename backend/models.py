@@ -142,6 +142,35 @@ class FavoriteFood(Base):
     user = relationship("User", back_populates="favorite_foods")
 
 
+class AnalysisFeedback(Base):
+    """
+    Обратная связь по распознаванию еды: что предложил ИИ и что подтвердил/
+    поправил пользователь. Копится как датасет для few-shot и будущего файнтюна.
+    """
+
+    __tablename__ = "analysis_feedback"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=True)
+    source = Column(String, nullable=False)        # photo | text | barcode
+    input_text = Column(String, nullable=True)     # описание (для text), null для фото
+    method = Column(String, nullable=True)         # rag:3/3|ensemble:... — диагностика
+    # Что предложил ИИ:
+    ai_name = Column(String, nullable=True)
+    ai_calories = Column(Float, default=0)
+    ai_protein_g = Column(Float, default=0)
+    ai_fat_g = Column(Float, default=0)
+    ai_carbs_g = Column(Float, default=0)
+    # Что в итоге сохранил пользователь:
+    final_name = Column(String, nullable=True)
+    final_calories = Column(Float, default=0)
+    final_protein_g = Column(Float, default=0)
+    final_fat_g = Column(Float, default=0)
+    final_carbs_g = Column(Float, default=0)
+    edited = Column(Boolean, default=False)        # правил ли пользователь ответ ИИ
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class WeightLog(Base):
     """Лог веса для отслеживания динамики."""
 

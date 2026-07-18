@@ -263,6 +263,56 @@ export async function getFoodsByCategory(category: string): Promise<SearchFood[]
   return data
 }
 
+// ---------- Штрихкод (Open Food Facts) ----------
+export interface BarcodeProduct {
+  found: boolean
+  code?: string
+  name?: string
+  brand?: string | null
+  calories_per_100g?: number
+  protein_per_100g?: number
+  fat_per_100g?: number
+  carbs_per_100g?: number
+  serving_g?: number | null
+}
+
+export async function lookupBarcode(code: string): Promise<BarcodeProduct> {
+  const { data } = await api.get<BarcodeProduct>(
+    `/api/barcode/${encodeURIComponent(code)}`,
+  )
+  return data
+}
+
+// ---------- Обратная связь по распознаванию (датасет качества) ----------
+export interface AnalysisFeedbackPayload {
+  user_id?: number | null
+  source: 'photo' | 'text' | 'barcode'
+  input_text?: string | null
+  method?: string | null
+  ai_name?: string | null
+  ai_calories: number
+  ai_protein_g: number
+  ai_fat_g: number
+  ai_carbs_g: number
+  final_name?: string | null
+  final_calories: number
+  final_protein_g: number
+  final_fat_g: number
+  final_carbs_g: number
+  edited: boolean
+}
+
+export async function sendAnalysisFeedback(
+  payload: AnalysisFeedbackPayload,
+): Promise<void> {
+  // fire-and-forget: сбой фидбека не должен мешать пользователю
+  try {
+    await api.post('/api/feedback/analysis', payload)
+  } catch {
+    /* ignore */
+  }
+}
+
 // ---------- Прогресс ----------
 export async function getWeeklyStats(userId: number): Promise<WeeklyStats> {
   const { data } = await api.get<WeeklyStats>(`/api/stats/weekly/${userId}`)

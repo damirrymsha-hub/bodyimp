@@ -1,11 +1,12 @@
 // Сканирование еды по фото: камера/галерея → отправка на /api/analyze/photo
 // → показ результата для подтверждения перед сохранением.
 import { useState } from 'react'
-import { Loader2, RotateCcw } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { analyzePhoto } from '../api/client'
 import type { PhotoAnalysisResult } from '../types'
 import { useUIStore } from '../store/uiStore'
 import PhotoSourcePicker from '../components/PhotoSourcePicker'
+import AnalysisResultCard from '../components/AnalysisResultCard'
 
 interface Props {
   // Вызывается с распознанными данными, когда пользователь подтверждает.
@@ -89,48 +90,15 @@ export default function ScanFood({ onConfirm, onManual }: Props) {
         </div>
       )}
 
+      {/* Результат: можно поправить перед добавлением (правки → фидбек) */}
       {result && !loading && (
-        <div className="rounded-3xl bg-card p-4 shadow-card">
-          <div className="text-lg font-bold">{result.name}</div>
-          {result.portion_g != null && (
-            <div className="text-xs text-muted">Порция ≈ {result.portion_g} г</div>
-          )}
-          <div className="mt-3 grid grid-cols-4 gap-2 text-center">
-            <Stat label="Ккал" value={result.calories} />
-            <Stat label="Белки" value={result.protein_g} />
-            <Stat label="Жиры" value={result.fat_g} />
-            <Stat label="Углев." value={result.carbs_g} />
-          </div>
-          {result.items && result.items.length > 0 && (
-            <div className="mt-3 text-xs text-muted">
-              Состав: {result.items.join(', ')}
-            </div>
-          )}
-          <div className="mt-4 flex gap-2">
-            <button
-              onClick={reset}
-              className="flex items-center justify-center gap-1.5 rounded-2xl bg-ink/5 px-4 py-3 text-sm font-semibold"
-            >
-              <RotateCcw size={16} /> Заново
-            </button>
-            <button
-              onClick={() => onConfirm(result)}
-              className="flex-1 rounded-2xl bg-ink py-3 text-sm font-semibold text-white"
-            >
-              Добавить
-            </button>
-          </div>
-        </div>
+        <AnalysisResultCard
+          result={result}
+          source="photo"
+          onConfirm={(final) => onConfirm(final)}
+          onRetry={reset}
+        />
       )}
-    </div>
-  )
-}
-
-function Stat({ label, value }: { label: string; value?: number }) {
-  return (
-    <div className="rounded-2xl bg-ink/5 py-2">
-      <div className="text-base font-bold">{value != null ? Math.round(value) : '—'}</div>
-      <div className="text-[10px] text-muted">{label}</div>
     </div>
   )
 }

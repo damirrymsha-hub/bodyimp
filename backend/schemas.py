@@ -121,6 +121,25 @@ class TextAnalyzeRequest(BaseModel):
     description: str
 
 
+# ---------- Обратная связь по распознаванию ----------
+class AnalysisFeedbackIn(BaseModel):
+    user_id: Optional[int] = None
+    source: str                       # photo | text | barcode
+    input_text: Optional[str] = None
+    method: Optional[str] = None
+    ai_name: Optional[str] = None
+    ai_calories: float = 0
+    ai_protein_g: float = 0
+    ai_fat_g: float = 0
+    ai_carbs_g: float = 0
+    final_name: Optional[str] = None
+    final_calories: float = 0
+    final_protein_g: float = 0
+    final_fat_g: float = 0
+    final_carbs_g: float = 0
+    edited: bool = False
+
+
 # ---------- Вода ----------
 class WaterAdd(BaseModel):
     user_id: int

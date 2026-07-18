@@ -1,0 +1,12 @@
+[
+  {"description": "2 варёных яйца и тост с маслом", "expected_kcal": 320, "tolerance_pct": 30, "must_contain": "яйц"},
+  {"description": "тарелка борща со сметаной и кусок чёрного хлеба", "expected_kcal": 300, "tolerance_pct": 30, "must_contain": "борщ"},
+  {"description": "гречка с куриной грудкой, 300 грамм", "expected_kcal": 400, "tolerance_pct": 30, "must_contain": "греч"},
+  {"description": "капучино и круассан", "expected_kcal": 340, "tolerance_pct": 35, "must_contain": "круассан"},
+  {"description": "большая тарелка плова", "expected_kcal": 760, "tolerance_pct": 35, "must_contain": "плов"},
+  {"description": "овсянка на молоке с бананом", "expected_kcal": 330, "tolerance_pct": 35, "must_contain": "овсян"},
+  {"description": "два куска пиццы пепперони", "expected_kcal": 640, "tolerance_pct": 35, "must_contain": "пицц"},
+  {"description": "творог 200 грамм со сметаной и ложкой мёда", "expected_kcal": 340, "tolerance_pct": 30, "must_contain": "творог"},
+  {"description": "шаурма с курицей", "expected_kcal": 700, "tolerance_pct": 40, "must_contain": "шаурм"},
+  {"description": "стакан кефира и печенье 3 штуки", "expected_kcal": 300, "tolerance_pct": 40, "must_contain": "кефир"}
+]

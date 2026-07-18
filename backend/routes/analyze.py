@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 
 import schemas
 from services.openrouter_service import analyze_food_photo, analyze_food_text
+from services.nutrition_ai import analyze_photo_v2, analyze_text_v2
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +34,18 @@ async def analyze_photo(payload: schemas.PhotoAnalyzeRequest):
         if len(payload.image_base64) < 1000:
             raise HTTPException(400, "Фото слишком маленькое или повреждённое")
 
-        result = await analyze_food_photo(
-            payload.image_base64,
-            payload.mime_type or "image/jpeg",
-        )
+        # Основной путь — точный пайплайн v2 (RAG + ансамбль);
+        # при его полном сбое откатываемся на старый одношаговый анализ.
+        try:
+            result = await analyze_photo_v2(
+                payload.image_base64, payload.mime_type or "image/jpeg"
+            )
+        except Exception as v2_err:  # noqa: BLE001
+            logger.warning(f"v2 photo pipeline failed, falling back to v1: {v2_err}")
+            result = await analyze_food_photo(
+                payload.image_base64,
+                payload.mime_type or "image/jpeg",
+            )
 
         if "error" in result:
             return {"success": False, "error": "no_food", "message": "На фото не обнаружена еда"}
@@ -70,7 +79,12 @@ async def analyze_text(payload: schemas.TextAnalyzeRequest):
         if len(description) > 1000:
             raise HTTPException(400, "Слишком длинное описание (максимум 1000 символов)")
 
-        result = await analyze_food_text(description)
+        # Основной путь — точный пайплайн v2; фолбэк — старый одношаговый.
+        try:
+            result = await analyze_text_v2(description)
+        except Exception as v2_err:  # noqa: BLE001
+            logger.warning(f"v2 text pipeline failed, falling back to v1: {v2_err}")
+            result = await analyze_food_text(description)
 
         if "error" in result:
             return {

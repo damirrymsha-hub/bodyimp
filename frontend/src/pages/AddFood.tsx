@@ -3,7 +3,16 @@
 // Если передан editingEntry — окно открывается сразу в режиме правки.
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { X, PencilLine, Camera, Search, Sparkles, Star, Trash2 } from 'lucide-react'
+import {
+  X,
+  PencilLine,
+  Camera,
+  Search,
+  Sparkles,
+  Star,
+  Trash2,
+  Barcode,
+} from 'lucide-react'
 import { z } from 'zod'
 import { useUserStore } from '../store/userStore'
 import { useUIStore } from '../store/uiStore'
@@ -13,8 +22,9 @@ import ScanFood from './ScanFood'
 import SearchTab from '../components/SearchTab'
 import FavoritesTab from '../components/FavoritesTab'
 import DescribeFood from '../components/DescribeFood'
+import BarcodeTab from '../components/BarcodeTab'
 
-type Mode = 'menu' | 'manual' | 'photo' | 'search' | 'favorites' | 'text'
+type Mode = 'menu' | 'manual' | 'photo' | 'search' | 'favorites' | 'text' | 'barcode'
 type UnitMode = 'portion' | 'per100'
 
 const MEALS: { value: MealType; label: string }[] = [
@@ -189,7 +199,9 @@ export default function AddFood({ onClose, editingEntry }: Props) {
                       ? 'Избранное'
                       : mode === 'text'
                         ? 'Описать текстом'
-                        : 'Быстрый поиск'}
+                        : mode === 'barcode'
+                          ? 'Штрихкод'
+                          : 'Быстрый поиск'}
           </h2>
           <button
             onClick={() =>
@@ -246,6 +258,15 @@ export default function AddFood({ onClose, editingEntry }: Props) {
               onClick={() => {
                 haptic('light')
                 setMode('text')
+              }}
+            />
+            <ModeButton
+              icon={<Barcode size={22} />}
+              title="Штрихкод"
+              subtitle="Точные данные с упаковки"
+              onClick={() => {
+                haptic('light')
+                setMode('barcode')
               }}
             />
             <ModeButton
@@ -424,6 +445,9 @@ export default function AddFood({ onClose, editingEntry }: Props) {
             onManual={() => setMode('manual')}
           />
         )}
+
+        {/* Штрихкод: скан или ручной ввод → Open Food Facts */}
+        {mode === 'barcode' && <BarcodeTab meal={meal} onAdded={onClose} />}
 
         {/* Быстрый поиск по базе продуктов */}
         {mode === 'search' && <SearchTab meal={meal} onAdded={onClose} />}

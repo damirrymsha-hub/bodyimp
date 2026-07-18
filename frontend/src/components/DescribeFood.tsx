@@ -1,11 +1,12 @@
 // Описание еды текстом: пользователь пишет, что съел («2 яйца и тост с маслом»),
 // ИИ оценивает КБЖУ → показываем результат для подтверждения перед сохранением.
 import { useState } from 'react'
-import { Loader2, RotateCcw, Sparkles } from 'lucide-react'
+import { Loader2, Sparkles } from 'lucide-react'
 import { analyzeText } from '../api/client'
 import type { PhotoAnalysisResult } from '../types'
 import { useUIStore } from '../store/uiStore'
 import { haptic } from '../lib/telegram'
+import AnalysisResultCard from './AnalysisResultCard'
 
 interface Props {
   // Вызывается с распознанными данными, когда пользователь подтверждает.
@@ -104,39 +105,15 @@ export default function DescribeFood({ onConfirm, onManual }: Props) {
         </>
       )}
 
-      {/* Результат анализа */}
+      {/* Результат анализа: можно поправить перед добавлением (правки → фидбек) */}
       {result && !loading && (
-        <div className="rounded-3xl bg-card p-4 shadow-card">
-          <div className="text-lg font-bold">{result.name}</div>
-          {result.portion_g != null && (
-            <div className="text-xs text-muted">Порция ≈ {result.portion_g} г</div>
-          )}
-          <div className="mt-3 grid grid-cols-4 gap-2 text-center">
-            <Stat label="Ккал" value={result.calories} />
-            <Stat label="Белки" value={result.protein_g} />
-            <Stat label="Жиры" value={result.fat_g} />
-            <Stat label="Углев." value={result.carbs_g} />
-          </div>
-          {result.items && result.items.length > 0 && (
-            <div className="mt-3 text-xs text-muted">
-              Состав: {result.items.join(', ')}
-            </div>
-          )}
-          <div className="mt-4 flex gap-2">
-            <button
-              onClick={reset}
-              className="flex items-center justify-center gap-1.5 rounded-2xl bg-ink/5 px-4 py-3 text-sm font-semibold"
-            >
-              <RotateCcw size={16} /> Заново
-            </button>
-            <button
-              onClick={() => onConfirm(result)}
-              className="flex-1 rounded-2xl bg-ink py-3 text-sm font-semibold text-white"
-            >
-              Добавить
-            </button>
-          </div>
-        </div>
+        <AnalysisResultCard
+          result={result}
+          source="text"
+          inputText={text.trim()}
+          onConfirm={(final) => onConfirm(final)}
+          onRetry={reset}
+        />
       )}
 
       {/* Фолбэк на ручной ввод */}
@@ -145,15 +122,6 @@ export default function DescribeFood({ onConfirm, onManual }: Props) {
           Ввести КБЖУ вручную
         </button>
       )}
-    </div>
-  )
-}
-
-function Stat({ label, value }: { label: string; value?: number }) {
-  return (
-    <div className="rounded-2xl bg-ink/5 py-2">
-      <div className="text-base font-bold">{value != null ? Math.round(value) : '—'}</div>
-      <div className="text-[10px] text-muted">{label}</div>
     </div>
   )
 }

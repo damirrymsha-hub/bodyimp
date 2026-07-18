@@ -115,6 +115,7 @@ export interface PhotoAnalysisResult {
   items?: string[]
   error?: string
   detail?: string
+  method?: string // диагностика пайплайна (rag:3/3 и т.п.)
 }
 
 export interface WeeklyStats {
