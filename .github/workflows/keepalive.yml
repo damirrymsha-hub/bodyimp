@@ -1,0 +1,19 @@
+# Кип-элайв для бесплатного инстанса Render: пингуем бэкенд по расписанию,
+# чтобы он не засыпал (сон = задержка ~50 сек и пропуск напоминаний бота).
+# GitHub может задерживать cron на 5–15 минут — поэтому основной пинг
+# делает UptimeRobot, а этот воркфлоу — страховка.
+name: keepalive
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # каждые ~10 минут
+  workflow_dispatch:          # ручной запуск из вкладки Actions
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend
+        run: |
+          curl -sS --max-time 60 -o /dev/null -w "backend: HTTP %{http_code}\n" \
+            https://bodyimp.onrender.com/ || echo "backend: недоступен (возможно, просыпается)"
