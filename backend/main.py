@@ -54,9 +54,12 @@ app.include_router(barcode.router)
 app.include_router(feedback.router)
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def root():
-    """Проверка работоспособности API."""
+    """
+    Проверка работоспособности API. HEAD нужен мониторам аптайма
+    (UptimeRobot по умолчанию шлёт HEAD; без него монитор видит 405=Down).
+    """
     return {"app": APP_NAME, "status": "ok"}
 
 
