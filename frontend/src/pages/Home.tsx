@@ -6,9 +6,10 @@ import { AnimatePresence } from 'framer-motion'
 import { Plus, UtensilsCrossed } from 'lucide-react'
 import { useUserStore } from '../store/userStore'
 import { useUIStore } from '../store/uiStore'
-import { copyDay, getStreak } from '../api/client'
-import { haptic, hapticSuccess } from '../lib/telegram'
-import { dayParts, toISODate } from '../lib/date'
+import { getStreak } from '../api/client'
+import { haptic } from '../lib/telegram'
+import { dayParts } from '../lib/date'
+import YesterdayModal from '../components/YesterdayModal'
 import CalendarStrip from '../components/CalendarStrip'
 import NutritionRing from '../components/NutritionRing'
 import WaterCard from '../components/WaterCard'
@@ -20,11 +21,11 @@ import type { FoodEntry } from '../types'
 export default function Home() {
   const navigate = useNavigate()
   const { user, foods, totals, netCalories, loadDay } = useUserStore()
-  const { selectedDate, showToast } = useUIStore()
+  const { selectedDate } = useUIStore()
   const [showAdd, setShowAdd] = useState(false)
+  const [showYesterday, setShowYesterday] = useState(false)
   const [editing, setEditing] = useState<FoodEntry | null>(null)
   const [streak, setStreak] = useState(0)
-  const [copying, setCopying] = useState(false)
 
   // Перезагружаем данные при смене выбранной даты в календаре.
   useEffect(() => {
@@ -35,25 +36,6 @@ export default function Home() {
   useEffect(() => {
     if (user) getStreak(user.id).then(setStreak).catch(() => {})
   }, [user, foods.length])
-
-  // «Повторить вчера»: копируем записи предыдущего дня в выбранный.
-  async function repeatYesterday() {
-    if (!user || copying) return
-    haptic('light')
-    const prev = new Date(selectedDate + 'T00:00:00')
-    prev.setDate(prev.getDate() - 1)
-    setCopying(true)
-    try {
-      const copied = await copyDay(user.id, toISODate(prev), selectedDate)
-      await loadDay(selectedDate)
-      hapticSuccess()
-      showToast(`Скопировано блюд: ${copied.length}`, 'success')
-    } catch {
-      showToast('Вчера не было записей', 'error')
-    } finally {
-      setCopying(false)
-    }
-  }
 
   if (!user) return null
   const t = totals()
@@ -142,11 +124,13 @@ export default function Home() {
               История
             </h2>
             <button
-              onClick={repeatYesterday}
-              disabled={copying}
-              className="text-xs font-semibold text-muted underline disabled:opacity-40"
+              onClick={() => {
+                haptic('light')
+                setShowYesterday(true)
+              }}
+              className="text-xs font-semibold text-muted underline"
             >
-              {copying ? 'Копируем…' : 'Повторить вчера'}
+              Повторить вчера
             </button>
           </div>
           {foods.length === 0 ? (
@@ -174,6 +158,9 @@ export default function Home() {
 
       <AnimatePresence>
         {showAdd && <AddFood onClose={() => setShowAdd(false)} />}
+        {showYesterday && (
+          <YesterdayModal onClose={() => setShowYesterday(false)} />
+        )}
         {editing && (
           <AddFood editingEntry={editing} onClose={() => setEditing(null)} />
         )}

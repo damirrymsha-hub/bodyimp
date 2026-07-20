@@ -1,7 +1,7 @@
 // Модальное окно добавления/редактирования еды.
 // Режимы: вручную (с пересчётом порции/100 г) / фото / быстрый поиск.
 // Если передан editingEntry — окно открывается сразу в режиме правки.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   X,
@@ -12,7 +12,10 @@ import {
   Star,
   Trash2,
   Barcode,
+  History,
+  Plus,
 } from 'lucide-react'
+import { getRecentFoods } from '../api/client'
 import { z } from 'zod'
 import { useUserStore } from '../store/userStore'
 import { useUIStore } from '../store/uiStore'
@@ -52,11 +55,37 @@ export default function AddFood({ onClose, editingEntry }: Props) {
   const isEditing = !!editingEntry
   const [mode, setMode] = useState<Mode>(isEditing ? 'manual' : 'menu')
   const [meal, setMeal] = useState<MealType>(editingEntry?.meal_type ?? 'snack')
-  const { addFood, updateFood, removeFood, addFavorite } = useUserStore()
+  const { user, addFood, updateFood, removeFood, addFavorite } = useUserStore()
   const { showToast } = useUIStore()
 
   // Чекбокс «Сохранить в избранное» (только при ручном добавлении).
   const [saveFav, setSaveFav] = useState(false)
+
+  // Недавние блюда — быстрое повторное добавление прямо из меню.
+  const [recents, setRecents] = useState<FoodEntry[]>([])
+  useEffect(() => {
+    if (user && !isEditing) {
+      getRecentFoods(user.id, 5).then(setRecents).catch(() => {})
+    }
+  }, [user, isEditing])
+
+  async function quickAddRecent(entry: FoodEntry) {
+    haptic('light')
+    await addFood({
+      meal_type: entry.meal_type, // тот же приём пищи, что и в прошлый раз
+      name: entry.name,
+      calories: entry.calories,
+      protein_g: entry.protein_g,
+      fat_g: entry.fat_g,
+      carbs_g: entry.carbs_g,
+      source: entry.source,
+      base_per_100g: false,
+      portion_size_g: entry.portion_size_g ?? null,
+    })
+    hapticSuccess()
+    showToast('Добавлено', 'success')
+    onClose()
+  }
 
   // Режим ввода базовых КБЖУ: на порцию или на 100 г.
   const initUnit: UnitMode = editingEntry?.base_per_100g ? 'per100' : 'portion'
@@ -291,6 +320,36 @@ export default function AddFood({ onClose, editingEntry }: Props) {
                 }}
               />
             </div>
+
+            {/* Недавние — повторное добавление в один тап */}
+            {recents.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-muted">
+                  <History size={12} /> Недавние
+                </div>
+                {recents.map((r) => (
+                  <div
+                    key={r.id}
+                    className="flex items-center gap-2 rounded-3xl bg-card p-3 shadow-card"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold">{r.name}</div>
+                      <div className="text-[11px] font-medium text-muted">
+                        {Math.round(r.calories)} ккал · Б {Math.round(r.protein_g)} ·
+                        Ж {Math.round(r.fat_g)} · У {Math.round(r.carbs_g)}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => quickAddRecent(r)}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-white"
+                      aria-label="Добавить снова"
+                    >
+                      <Plus size={18} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
