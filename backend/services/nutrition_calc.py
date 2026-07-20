@@ -263,6 +263,44 @@ def calculate_nutrition(
 
 
 # ============================================================================
+# Адаптивная норма (а-ля MacroFactor): оцениваем фактический TDEE по еде и весу.
+# ============================================================================
+KCAL_PER_KG = 7700  # энергетическая «стоимость» 1 кг массы тела
+
+
+def estimate_tdee_from_logs(
+    daily_kcals: list[float],
+    weight_start: float,
+    weight_end: float,
+    days_span: int,
+) -> int | None:
+    """
+    Оценка фактического TDEE: средний приём калорий минус энергия изменения веса.
+    Возвращает None, если данных мало (< 4 дней с едой или срок < 5 дней).
+    """
+    kcals = [k for k in daily_kcals if k > 0]
+    if len(kcals) < 4 or days_span < 5:
+        return None
+    avg_intake = sum(kcals) / len(kcals)
+    weight_delta = weight_end - weight_start
+    est = avg_intake - (weight_delta * KCAL_PER_KG) / days_span
+    # Отсекаем явный мусор (недологированная еда и т.п.).
+    if est < 800 or est > 6000:
+        return None
+    return round(est)
+
+
+def smooth_adjustment(old_adjustment: int, target_delta: float) -> int:
+    """
+    Сглаживание поправки: двигаемся к цели наполовину за шаг,
+    итог ограничен ±400 ккал (защита от резких скачков нормы).
+    """
+    delta = max(-500.0, min(500.0, target_delta))
+    new = 0.5 * old_adjustment + 0.5 * delta
+    return int(max(-400, min(400, round(new))))
+
+
+# ============================================================================
 # Расход калорий по видам активности (используется разделом «Активность»).
 # НЕ удалять — импортируется в routes/activity.py.
 # ============================================================================

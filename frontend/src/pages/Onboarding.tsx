@@ -35,6 +35,9 @@ export default function Onboarding() {
   const [weight, setWeight] = useState('')
   const [activity, setActivity] = useState<ActivityLevel | null>(null)
   const [goal, setGoal] = useState<Goal | null>(null)
+  // Помощники (шаг 4): напоминания ботом и адаптивная норма. По умолчанию вкл.
+  const [notify, setNotify] = useState(true)
+  const [adaptive, setAdaptive] = useState(true)
   const [result, setResult] = useState<User | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -57,7 +60,7 @@ export default function Onboarding() {
     return true
   }
 
-  // На шаге 3 (после выбора цели) — рассчитываем нормы на сервере.
+  // На шаге 4 (после помощников) — рассчитываем нормы на сервере.
   async function calculate() {
     if (!telegramId) return
     setSaving(true)
@@ -69,10 +72,12 @@ export default function Onboarding() {
         weight_kg: Number(weight),
         activity_level: activity!,
         goal: goal!,
+        notifications_enabled: notify,
+        adaptive_tdee: adaptive,
       })
       setUser(user)
       setResult(user)
-      setStep(4)
+      setStep(5)
     } catch {
       showToast('Не удалось рассчитать нормы. Проверьте соединение.', 'error')
     } finally {
@@ -89,7 +94,7 @@ export default function Onboarding() {
     <div className="flex min-h-screen flex-col px-5 pb-8 pt-6">
       {/* Прогресс-индикатор */}
       <div className="mb-6 flex gap-1.5">
-        {[0, 1, 2, 3, 4].map((i) => (
+        {[0, 1, 2, 3, 4, 5].map((i) => (
           <div
             key={i}
             className={`h-1.5 flex-1 rounded-full ${i <= step ? 'bg-ink' : 'bg-ink/10'}`}
@@ -171,8 +176,31 @@ export default function Onboarding() {
             </Step>
           )}
 
-          {/* Шаг 4 — итог */}
-          {step === 4 && result && (
+          {/* Шаг 4 — помощники: напоминания и адаптивная норма */}
+          {step === 4 && (
+            <Step title="Помощники">
+              <div className="flex flex-col gap-2">
+                <ListCard
+                  active={notify}
+                  onClick={() => setNotify((v) => !v)}
+                  title="Напоминания от бота"
+                  desc="Вода днём и вечерняя сводка — прямо в чат Telegram"
+                />
+                <ListCard
+                  active={adaptive}
+                  onClick={() => setAdaptive((v) => !v)}
+                  title="Умная норма калорий"
+                  desc="Раз в неделю скорректируем норму по динамике твоего веса"
+                />
+              </div>
+              <p className="mt-4 text-xs text-muted">
+                Обе настройки можно поменять в профиле в любой момент.
+              </p>
+            </Step>
+          )}
+
+          {/* Шаг 5 — итог */}
+          {step === 5 && result && (
             <Step title="Твоя персональная норма">
               <div className="rounded-3xl bg-card p-6 text-center shadow-card">
                 <div className="text-5xl font-extrabold">{result.daily_calories}</div>
@@ -225,7 +253,7 @@ export default function Onboarding() {
 
       {/* Навигация */}
       <div className="mt-6 flex gap-3">
-        {step > 0 && step < 4 && (
+        {step > 0 && step < 5 && (
           <button
             onClick={back}
             className="flex h-14 w-14 items-center justify-center rounded-2xl bg-card shadow-card"
@@ -234,7 +262,7 @@ export default function Onboarding() {
           </button>
         )}
 
-        {step < 3 && (
+        {step < 4 && (
           <button
             disabled={!canProceed()}
             onClick={next}
@@ -244,9 +272,9 @@ export default function Onboarding() {
           </button>
         )}
 
-        {step === 3 && (
+        {step === 4 && (
           <button
-            disabled={!canProceed() || saving}
+            disabled={saving}
             onClick={calculate}
             className="flex flex-1 items-center justify-center gap-1 rounded-2xl bg-ink py-4 text-sm font-semibold text-white disabled:opacity-30"
           >
@@ -254,7 +282,7 @@ export default function Onboarding() {
           </button>
         )}
 
-        {step === 4 && (
+        {step === 5 && (
           <button
             onClick={finish}
             className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-ink py-4 text-sm font-semibold text-white"

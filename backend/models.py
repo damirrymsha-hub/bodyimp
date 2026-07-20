@@ -46,6 +46,17 @@ class User(Base):
     daily_water_ml = Column(Integer, default=2000)
     water_goal_custom = Column(Boolean, default=False)
 
+    # Напоминания ботом (вода днём, ужин/сводка вечером). Выбор при онбординге.
+    notifications_enabled = Column(Boolean, default=False)
+    last_water_notify = Column(Date, nullable=True)     # анти-дубль за день
+    last_evening_notify = Column(Date, nullable=True)
+
+    # Адаптивная норма (а-ля MacroFactor): еженедельная коррекция калорий
+    # по фактической динамике веса. tdee_adjustment — накопленная поправка, ккал.
+    adaptive_tdee = Column(Boolean, default=False)
+    tdee_adjustment = Column(Integer, default=0)
+    last_tdee_adjust = Column(Date, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Связи (каскадное удаление записей при удалении пользователя)

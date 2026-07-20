@@ -6,8 +6,9 @@ import { AnimatePresence } from 'framer-motion'
 import { Plus, UtensilsCrossed } from 'lucide-react'
 import { useUserStore } from '../store/userStore'
 import { useUIStore } from '../store/uiStore'
-import { haptic } from '../lib/telegram'
-import { dayParts } from '../lib/date'
+import { copyDay, getStreak } from '../api/client'
+import { haptic, hapticSuccess } from '../lib/telegram'
+import { dayParts, toISODate } from '../lib/date'
 import CalendarStrip from '../components/CalendarStrip'
 import NutritionRing from '../components/NutritionRing'
 import WaterCard from '../components/WaterCard'
@@ -19,14 +20,40 @@ import type { FoodEntry } from '../types'
 export default function Home() {
   const navigate = useNavigate()
   const { user, foods, totals, netCalories, loadDay } = useUserStore()
-  const { selectedDate } = useUIStore()
+  const { selectedDate, showToast } = useUIStore()
   const [showAdd, setShowAdd] = useState(false)
   const [editing, setEditing] = useState<FoodEntry | null>(null)
+  const [streak, setStreak] = useState(0)
+  const [copying, setCopying] = useState(false)
 
   // Перезагружаем данные при смене выбранной даты в календаре.
   useEffect(() => {
     if (user) loadDay(selectedDate)
   }, [selectedDate, user, loadDay])
+
+  // Стрик дневника (обновляем при изменении списка еды).
+  useEffect(() => {
+    if (user) getStreak(user.id).then(setStreak).catch(() => {})
+  }, [user, foods.length])
+
+  // «Повторить вчера»: копируем записи предыдущего дня в выбранный.
+  async function repeatYesterday() {
+    if (!user || copying) return
+    haptic('light')
+    const prev = new Date(selectedDate + 'T00:00:00')
+    prev.setDate(prev.getDate() - 1)
+    setCopying(true)
+    try {
+      const copied = await copyDay(user.id, toISODate(prev), selectedDate)
+      await loadDay(selectedDate)
+      hapticSuccess()
+      showToast(`Скопировано блюд: ${copied.length}`, 'success')
+    } catch {
+      showToast('Вчера не было записей', 'error')
+    } finally {
+      setCopying(false)
+    }
+  }
 
   if (!user) return null
   const t = totals()
@@ -44,13 +71,21 @@ export default function Home() {
             <div className="text-xs font-medium text-muted">{weekday}</div>
             <h1 className="text-xl font-extrabold">{label}</h1>
           </div>
-          <button
-            onClick={() => navigate('/profile')}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-ink text-sm font-bold text-white"
-            aria-label="Профиль"
-          >
-            {initial}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Стрик дневника */}
+            {streak >= 2 && (
+              <span className="flex items-center gap-1 rounded-full bg-card px-3 py-1.5 text-xs font-bold shadow-card">
+                🔥 {streak}
+              </span>
+            )}
+            <button
+              onClick={() => navigate('/profile')}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-ink text-sm font-bold text-white"
+              aria-label="Профиль"
+            >
+              {initial}
+            </button>
+          </div>
         </header>
 
         {/* Недельный календарь */}
@@ -102,9 +137,18 @@ export default function Home() {
 
         {/* История еды */}
         <section className="flex flex-col gap-2">
-          <h2 className="px-1 text-xs font-semibold uppercase tracking-wider text-muted">
-            История
-          </h2>
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">
+              История
+            </h2>
+            <button
+              onClick={repeatYesterday}
+              disabled={copying}
+              className="text-xs font-semibold text-muted underline disabled:opacity-40"
+            >
+              {copying ? 'Копируем…' : 'Повторить вчера'}
+            </button>
+          </div>
           {foods.length === 0 ? (
             <div className="flex flex-col items-center gap-2 rounded-3xl bg-card py-10 text-muted shadow-card">
               <UtensilsCrossed size={28} />

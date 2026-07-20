@@ -36,6 +36,8 @@ export interface RegisterPayload {
   weight_kg?: number
   goal?: Goal
   activity_level?: ActivityLevel
+  notifications_enabled?: boolean
+  adaptive_tdee?: boolean
 }
 
 export async function registerUser(payload: RegisterPayload): Promise<User> {
@@ -122,6 +124,37 @@ export async function getFoodHistory(
 
 export async function deleteFood(entryId: number): Promise<void> {
   await api.delete(`/api/food/${entryId}`)
+}
+
+// «Повторить вчера»: копирует записи одного дня в другой.
+export async function copyDay(
+  userId: number,
+  fromDate: string,
+  toDate: string,
+): Promise<FoodEntry[]> {
+  const { data } = await api.post<FoodEntry[]>('/api/food/copy-day', {
+    user_id: userId,
+    from_date: fromDate,
+    to_date: toDate,
+  })
+  return data
+}
+
+// Недавние блюда без повторов (для быстрого добавления в поиске).
+export async function getRecentFoods(
+  userId: number,
+  limit = 8,
+): Promise<FoodEntry[]> {
+  const { data } = await api.get<FoodEntry[]>(`/api/food/recent/${userId}`, {
+    params: { limit },
+  })
+  return data
+}
+
+// Стрик дневника: сколько дней подряд есть записи еды.
+export async function getStreak(userId: number): Promise<number> {
+  const { data } = await api.get<{ streak: number }>(`/api/stats/streak/${userId}`)
+  return data.streak
 }
 
 // ---------- Анализ фото ----------

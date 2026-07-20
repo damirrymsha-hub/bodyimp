@@ -68,6 +68,31 @@ def weekly_stats(user_id: int, db: Session = Depends(get_db)):
     )
 
 
+@router.get("/stats/streak/{user_id}")
+def streak(user_id: int, db: Session = Depends(get_db)):
+    """
+    Стрик дневника: сколько дней подряд есть хотя бы одна запись еды.
+    Если сегодня ещё пусто — считаем от вчера (стрик не сгорает днём).
+    """
+    dates = {
+        row[0]
+        for row in db.query(models.FoodEntry.date)
+        .filter(models.FoodEntry.user_id == user_id)
+        .distinct()
+        .all()
+    }
+    today = date_cls.today()
+    start = today if today in dates else today - timedelta(days=1)
+    if start not in dates:
+        return {"streak": 0}
+    count = 0
+    d = start
+    while d in dates:
+        count += 1
+        d -= timedelta(days=1)
+    return {"streak": count}
+
+
 @router.post("/weight/log", response_model=schemas.WeightOut)
 def log_weight(payload: schemas.WeightLogIn, db: Session = Depends(get_db)):
     """Сохраняет замер веса. Также обновляет текущий вес в профиле."""

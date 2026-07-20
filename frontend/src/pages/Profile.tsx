@@ -211,6 +211,13 @@ export default function Profile() {
             • {n}
           </div>
         ))}
+        {/* Бейдж адаптивной поправки (считается на сервере раз в неделю) */}
+        {user.adaptive_tdee && (user.tdee_adjustment ?? 0) !== 0 && (
+          <div className="mt-2 text-xs font-semibold text-steps">
+            Умная норма: {(user.tdee_adjustment ?? 0) > 0 ? '+' : ''}
+            {user.tdee_adjustment} ккал по динамике веса
+          </div>
+        )}
       </section>
 
       <button
@@ -220,6 +227,43 @@ export default function Profile() {
       >
         <Flame size={16} /> {saving ? 'Сохранение…' : 'Сохранить изменения'}
       </button>
+
+      {/* Помощники: напоминания и адаптивная норма */}
+      <section className="mt-6">
+        <h2 className="mb-2 px-1 text-xs font-semibold uppercase text-muted">
+          Помощники
+        </h2>
+        <div className="flex flex-col gap-2">
+          <ToggleRow
+            title="Напоминания от бота"
+            desc="Вода днём и вечерняя сводка в чат"
+            value={!!user.notifications_enabled}
+            onChange={async (v) => {
+              if (!telegramId) return
+              haptic('light')
+              try {
+                setUser(await updateUser(telegramId, { notifications_enabled: v }))
+              } catch {
+                showToast('Не удалось сохранить', 'error')
+              }
+            }}
+          />
+          <ToggleRow
+            title="Умная норма калорий"
+            desc="Еженедельная коррекция по динамике веса"
+            value={!!user.adaptive_tdee}
+            onChange={async (v) => {
+              if (!telegramId) return
+              haptic('light')
+              try {
+                setUser(await updateUser(telegramId, { adaptive_tdee: v }))
+              } catch {
+                showToast('Не удалось сохранить', 'error')
+              }
+            }}
+          />
+        </div>
+      </section>
 
       {/* Цели приложения — только норма воды */}
       <section className="mt-6">
@@ -262,6 +306,42 @@ export default function Profile() {
         </div>
       </section>
     </div>
+  )
+}
+
+// Строка-переключатель (Помощники): заголовок + описание + свитч.
+function ToggleRow({
+  title,
+  desc,
+  value,
+  onChange,
+}: {
+  title: string
+  desc: string
+  value: boolean
+  onChange: (v: boolean) => void
+}) {
+  return (
+    <button
+      onClick={() => onChange(!value)}
+      className="flex w-full items-center gap-3 rounded-3xl bg-card p-4 text-left shadow-card"
+    >
+      <div className="flex-1">
+        <div className="text-sm font-semibold">{title}</div>
+        <div className="mt-0.5 text-[11px] font-medium text-muted">{desc}</div>
+      </div>
+      <span
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+          value ? 'bg-ink' : 'bg-ink/10'
+        }`}
+      >
+        <span
+          className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
+            value ? 'left-6' : 'left-1'
+          }`}
+        />
+      </span>
+    </button>
   )
 }
 

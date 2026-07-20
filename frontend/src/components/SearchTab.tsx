@@ -2,15 +2,17 @@
 // карточки продуктов с кнопками ⭐ (избранное) и + (добавить через AmountModal).
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
-import { Search, Star, Plus } from 'lucide-react'
+import { History, Search, Star, Plus } from 'lucide-react'
 import {
   searchFoods,
   getFoodCategories,
   getFoodsByCategory,
+  getRecentFoods,
 } from '../api/client'
 import { useUserStore } from '../store/userStore'
-import { haptic } from '../lib/telegram'
-import type { SearchFood, MealType } from '../types'
+import { useUIStore } from '../store/uiStore'
+import { haptic, hapticSuccess } from '../lib/telegram'
+import type { FoodEntry, SearchFood, MealType } from '../types'
 import AmountModal from './AmountModal'
 
 interface Props {
@@ -26,8 +28,33 @@ export default function SearchTab({ meal, onAdded }: Props) {
   const [categories, setCategories] = useState<string[]>([])
   const [results, setResults] = useState<SearchFood[]>([])
   const [selected, setSelected] = useState<SearchFood | null>(null)
-  const { isFavorite, addFavorite, removeFavorite, favoriteByName } =
+  const [recents, setRecents] = useState<FoodEntry[]>([])
+  const { user, addFood, isFavorite, addFavorite, removeFavorite, favoriteByName } =
     useUserStore()
+  const { showToast } = useUIStore()
+
+  // Недавние блюда — для повторного добавления в один тап.
+  useEffect(() => {
+    if (user) getRecentFoods(user.id).then(setRecents).catch(() => {})
+  }, [user])
+
+  async function quickAdd(entry: FoodEntry) {
+    haptic('light')
+    await addFood({
+      meal_type: meal,
+      name: entry.name,
+      calories: entry.calories,
+      protein_g: entry.protein_g,
+      fat_g: entry.fat_g,
+      carbs_g: entry.carbs_g,
+      source: 'scan',
+      base_per_100g: false,
+      portion_size_g: entry.portion_size_g ?? null,
+    })
+    hapticSuccess()
+    showToast('Добавлено', 'success')
+    onAdded?.()
+  }
 
   // Категории грузим один раз.
   useEffect(() => {
@@ -114,6 +141,39 @@ export default function SearchTab({ meal, onAdded }: Props) {
           </button>
         ))}
       </div>
+
+      {/* Недавние — добавление в один тап */}
+      {!query.trim() && category === ALL && recents.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-muted">
+            <History size={12} /> Недавние
+          </div>
+          {recents.map((r) => (
+            <div
+              key={r.id}
+              className="flex items-center gap-2 rounded-3xl bg-card p-3 shadow-card"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold">{r.name}</div>
+                <div className="text-[11px] font-medium text-muted">
+                  {Math.round(r.calories)} ккал · Б {Math.round(r.protein_g)} · Ж{' '}
+                  {Math.round(r.fat_g)} · У {Math.round(r.carbs_g)}
+                </div>
+              </div>
+              <button
+                onClick={() => quickAdd(r)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-white"
+                aria-label="Добавить снова"
+              >
+                <Plus size={18} />
+              </button>
+            </div>
+          ))}
+          <div className="px-1 text-xs font-semibold uppercase tracking-wider text-muted">
+            База продуктов
+          </div>
+        </div>
+      )}
 
       {/* Результаты */}
       <div className="flex flex-col gap-2">

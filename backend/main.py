@@ -3,10 +3,12 @@
 - Поднимает FastAPI с роутами.
 - Настраивает CORS (в проде — только FRONTEND_URL, в dev — '*').
 - Запускает Telegram-бота в фоне рядом с API.
+- Фоновый планировщик напоминаний (вода днём, вечерняя сводка).
 """
 import os
 import asyncio
 import contextlib
+from datetime import datetime, timedelta, timezone, date as date_cls
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, Request
@@ -138,6 +140,102 @@ async def bot_webhook(request: Request):
     return {"ok": True}
 
 
+# ---------- Напоминания ботом ----------
+# Время в МСК (UTC+3): вода — 12:00, вечерняя сводка — 20:00.
+MSK = timezone(timedelta(hours=3))
+WATER_HOUR = 12
+EVENING_HOUR = 20
+
+
+async def _send_reminders() -> None:
+    """Один тик планировщика: рассылает напоминания, у кого они включены."""
+    if _bot_app is None:
+        return
+    now = datetime.now(MSK)
+    kind = "water" if now.hour == WATER_HOUR else "evening" if now.hour == EVENING_HOUR else None
+    if kind is None:
+        return
+
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+    from sqlalchemy import func
+    from database import SessionLocal
+    import models
+
+    today = now.date()
+    kb = None
+    if FRONTEND_URL:
+        kb = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("Открыть BodyImp", web_app=WebAppInfo(url=FRONTEND_URL))]]
+        )
+
+    db = SessionLocal()
+    try:
+        users = (
+            db.query(models.User)
+            .filter(models.User.notifications_enabled == True)  # noqa: E712
+            .all()
+        )
+        for u in users:
+            last = u.last_water_notify if kind == "water" else u.last_evening_notify
+            if last == today:
+                continue  # уже отправляли сегодня
+
+            if kind == "water":
+                drunk = (
+                    db.query(func.coalesce(func.sum(models.WaterEntry.amount_ml), 0))
+                    .filter(
+                        models.WaterEntry.user_id == u.id,
+                        models.WaterEntry.date == today,
+                    )
+                    .scalar()
+                )
+                goal = u.daily_water_ml or 2000
+                text = (
+                    f"💧 Не забудь попить воды!\n"
+                    f"Сегодня выпито {int(drunk)} из {goal} мл."
+                )
+            else:
+                eaten = (
+                    db.query(func.coalesce(func.sum(models.FoodEntry.calories), 0))
+                    .filter(
+                        models.FoodEntry.user_id == u.id,
+                        models.FoodEntry.date == today,
+                    )
+                    .scalar()
+                )
+                goal = u.daily_calories or 2000
+                left = max(0, round(goal - float(eaten)))
+                text = (
+                    f"🌙 Как прошёл день?\n"
+                    f"Съедено {round(float(eaten))} ккал, осталось {left}.\n"
+                    f"Не забудь записать ужин!"
+                )
+
+            try:
+                await _bot_app.bot.send_message(u.telegram_id, text, reply_markup=kb)
+            except Exception as exc:  # noqa: BLE001
+                print(f"[notify] не отправилось {u.telegram_id}: {exc}")
+                continue
+
+            if kind == "water":
+                u.last_water_notify = today
+            else:
+                u.last_evening_notify = today
+            db.commit()
+    finally:
+        db.close()
+
+
+async def _notifier_loop() -> None:
+    """Вечный цикл: проверяем напоминания раз в минуту."""
+    while True:
+        try:
+            await _send_reminders()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[notify] ошибка тика: {exc}")
+        await asyncio.sleep(60)
+
+
 @app.on_event("startup")
 async def on_startup():
     """Инициализирует БД и запускает Telegram-бота в фоне."""
@@ -171,6 +269,10 @@ async def on_startup():
         except Exception as exc:  # noqa: BLE001
             _bot_app = None
             print(f"[WARN] Не удалось запустить Telegram-бота: {exc}. API работает без бота.")
+
+    # Планировщик напоминаний (работает, пока инстанс не спит — держим
+    # его бодрым пингом UptimeRobot).
+    asyncio.create_task(_notifier_loop())
 
 
 @app.on_event("shutdown")

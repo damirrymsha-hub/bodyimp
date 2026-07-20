@@ -40,35 +40,50 @@ def get_db():
 
 def _ensure_columns():
     """
-    Лёгкая миграция для SQLite: добавляет недостающие колонки в существующие
-    таблицы (create_all не умеет изменять уже созданные таблицы).
+    Лёгкая миграция: добавляет недостающие колонки в существующие таблицы
+    (create_all не умеет изменять уже созданные). Работает и для SQLite
+    (PRAGMA + ALTER), и для Postgres (ADD COLUMN IF NOT EXISTS).
     """
-    if not DATABASE_URL.startswith("sqlite"):
-        return
-
     from sqlalchemy import text
 
-    # Таблица -> {колонка: SQL-определение}. Досоздаём недостающие колонки.
+    # Таблица -> {колонка: (sqlite DDL, postgres DDL)}.
     migrations = {
         "food_entries": {
-            "base_per_100g": "INTEGER DEFAULT 0",
-            "portion_size_g": "FLOAT",
+            "base_per_100g": ("INTEGER DEFAULT 0", "INTEGER DEFAULT 0"),
+            "portion_size_g": ("FLOAT", "DOUBLE PRECISION"),
         },
         "users": {
-            "daily_water_ml": "INTEGER DEFAULT 2000",
-            "water_goal_custom": "INTEGER DEFAULT 0",
+            "daily_water_ml": ("INTEGER DEFAULT 2000", "INTEGER DEFAULT 2000"),
+            "water_goal_custom": ("INTEGER DEFAULT 0", "BOOLEAN DEFAULT FALSE"),
+            "notifications_enabled": ("INTEGER DEFAULT 0", "BOOLEAN DEFAULT FALSE"),
+            "last_water_notify": ("DATE", "DATE"),
+            "last_evening_notify": ("DATE", "DATE"),
+            "adaptive_tdee": ("INTEGER DEFAULT 0", "BOOLEAN DEFAULT FALSE"),
+            "tdee_adjustment": ("INTEGER DEFAULT 0", "INTEGER DEFAULT 0"),
+            "last_tdee_adjust": ("DATE", "DATE"),
         },
     }
+
+    is_sqlite = DATABASE_URL.startswith("sqlite")
     with engine.begin() as conn:
         for table, columns in migrations.items():
-            existing = {
-                row[1]
-                for row in conn.execute(text(f"PRAGMA table_info({table})"))
-            }
-            for col, ddl in columns.items():
-                if col not in existing:
+            if is_sqlite:
+                existing = {
+                    row[1]
+                    for row in conn.execute(text(f"PRAGMA table_info({table})"))
+                }
+                for col, (ddl, _) in columns.items():
+                    if col not in existing:
+                        conn.execute(
+                            text(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
+                        )
+            else:
+                for col, (_, ddl) in columns.items():
                     conn.execute(
-                        text(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
+                        text(
+                            f"ALTER TABLE {table} "
+                            f"ADD COLUMN IF NOT EXISTS {col} {ddl}"
+                        )
                     )
 
 

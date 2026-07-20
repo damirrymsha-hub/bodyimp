@@ -35,6 +35,73 @@ def add_food(payload: schemas.FoodAdd, db: Session = Depends(get_db)):
     return entry
 
 
+@router.post("/copy-day", response_model=list[schemas.FoodOut])
+def copy_day(payload: schemas.CopyDayIn, db: Session = Depends(get_db)):
+    """
+    Копирует все записи еды с одного дня на другой («Повторить вчера»).
+    Возвращает созданные записи; 404 — если день-источник пуст.
+    """
+    src = (
+        db.query(models.FoodEntry)
+        .filter(
+            models.FoodEntry.user_id == payload.user_id,
+            models.FoodEntry.date == payload.from_date,
+        )
+        .all()
+    )
+    if not src:
+        raise HTTPException(404, "В этот день не было записей")
+
+    copies = [
+        models.FoodEntry(
+            user_id=e.user_id,
+            date=payload.to_date,
+            meal_type=e.meal_type,
+            name=e.name,
+            calories=e.calories,
+            protein_g=e.protein_g,
+            fat_g=e.fat_g,
+            carbs_g=e.carbs_g,
+            source=e.source,
+            base_per_100g=e.base_per_100g,
+            portion_size_g=e.portion_size_g,
+        )
+        for e in src
+    ]
+    db.add_all(copies)
+    db.commit()
+    for c in copies:
+        db.refresh(c)
+    return copies
+
+
+@router.get("/recent/{user_id}", response_model=list[schemas.FoodOut])
+def recent_foods(
+    user_id: int,
+    limit: int = Query(default=8, le=20),
+    db: Session = Depends(get_db),
+):
+    """Недавние блюда без повторов по названию (для быстрого повторного добавления)."""
+    rows = (
+        db.query(models.FoodEntry)
+        .filter(models.FoodEntry.user_id == user_id)
+        .order_by(models.FoodEntry.created_at.desc())
+        .limit(120)
+        .all()
+    )
+    seen: set[str] = set()
+    out = []
+    for e in rows:
+        key = e.name.strip().lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(e)
+        if len(out) >= limit:
+            break
+    return out
+
+
 @router.get("/today/{user_id}", response_model=list[schemas.FoodOut])
 def get_today(
     user_id: int,
