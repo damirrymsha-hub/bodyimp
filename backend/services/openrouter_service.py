@@ -21,14 +21,18 @@ logger = logging.getLogger(__name__)
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-# Перебираем бесплатные модели с поддержкой image-input (проверено по
-# /api/v1/models на 2026-05). Список меняется со временем — актуальность
-# можно проверить эндпоинтом /api/test/openrouter.
-VISION_MODELS = [
+# Список моделей настраивается переменной окружения AI_MODELS
+# (id через запятую, порядок = приоритет; первые 1–2 — основные, дальше фолбэк).
+# Пример платной конфигурации:
+#   AI_MODELS=google/gemini-3.1-flash-lite,google/gemma-4-31b-it:free
+# Без переменной — бесплатный набор по умолчанию (проверен по /api/v1/models).
+_DEFAULT_MODELS = [
     "google/gemma-4-31b-it:free",         # Google Gemma vision, хорошо отдаёт JSON
     "google/gemma-4-26b-a4b-it:free",     # запасной Gemma vision
     "nvidia/nemotron-nano-12b-v2-vl:free",  # последний вариант (vision-language)
 ]
+_env_models = [m.strip() for m in os.getenv("AI_MODELS", "").split(",") if m.strip()]
+VISION_MODELS = _env_models or _DEFAULT_MODELS
 
 FOOD_SYSTEM_PROMPT = """You are a nutrition analyst. Analyze the food in the image and respond ONLY with a JSON object in this exact format, no markdown, no explanation:
 {

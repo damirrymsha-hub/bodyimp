@@ -171,17 +171,21 @@ async def analyze_v2(user_content) -> dict:
         if final:
             candidates.append(final)
 
-    # Резерв: третья модель, если обе не справились.
-    if not candidates and len(VISION_MODELS) > 2:
-        try:
-            res = await _recognize(VISION_MODELS[2], user_content)
+    # Резерв: перебираем оставшиеся модели списка, пока одна не справится
+    # (важно при AI_ENSEMBLE=0 — тогда фолбэком служит вторая/третья модель).
+    if not candidates:
+        for reserve in VISION_MODELS[len(models):]:
+            try:
+                res = await _recognize(reserve, user_content)
+            except Exception as e:  # noqa: BLE001
+                last_error = e
+                continue
             if "error" in res:
                 return {"error": "no_food"}
-            final = _finalize(res, VISION_MODELS[2])
+            final = _finalize(res, reserve)
             if final:
                 candidates.append(final)
-        except Exception as e:  # noqa: BLE001
-            last_error = e
+                break
 
     if not candidates:
         raise Exception(f"Все модели недоступны. Последняя ошибка: {last_error}")
