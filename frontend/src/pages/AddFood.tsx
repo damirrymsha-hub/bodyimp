@@ -46,15 +46,36 @@ const manualSchema = z.object({
   carbs_g: z.number().min(0).max(1000),
 })
 
+// Приём пищи по времени суток — разумный старт вместо вечного «Перекуса».
+function mealByTime(): MealType {
+  const h = new Date().getHours()
+  if (h < 11) return 'breakfast'
+  if (h < 16) return 'lunch'
+  if (h < 21) return 'dinner'
+  return 'snack'
+}
+
+const MEAL_IN: Record<MealType, string> = {
+  breakfast: 'завтрак',
+  lunch: 'обед',
+  dinner: 'ужин',
+  snack: 'перекус',
+}
+
 interface Props {
   onClose: () => void
   editingEntry?: FoodEntry // если задано — режим редактирования
+  initialMeal?: MealType   // задан при входе из секции дневника
 }
 
-export default function AddFood({ onClose, editingEntry }: Props) {
+export default function AddFood({ onClose, editingEntry, initialMeal }: Props) {
   const isEditing = !!editingEntry
   const [mode, setMode] = useState<Mode>(isEditing ? 'manual' : 'menu')
-  const [meal, setMeal] = useState<MealType>(editingEntry?.meal_type ?? 'snack')
+  const [meal, setMeal] = useState<MealType>(
+    editingEntry?.meal_type ?? initialMeal ?? mealByTime(),
+  )
+  // Аккордеон «Другие способы» — свёрнут, когда пришли из секции дневника.
+  const [modesOpen, setModesOpen] = useState(!initialMeal)
   const { user, addFood, updateFood, removeFood, addFavorite } = useUserStore()
   const { showToast } = useUIStore()
 
@@ -219,7 +240,9 @@ export default function AddFood({ onClose, editingEntry }: Props) {
             {isEditing
               ? 'Редактировать'
               : mode === 'menu'
-                ? 'Добавить еду'
+                ? initialMeal
+                  ? `Добавить в ${MEAL_IN[initialMeal]}`
+                  : 'Добавить еду'
                 : mode === 'manual'
                   ? 'Вручную'
                   : mode === 'photo'
@@ -236,7 +259,8 @@ export default function AddFood({ onClose, editingEntry }: Props) {
             onClick={() =>
               isEditing || mode === 'menu' ? onClose() : setMode('menu')
             }
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-ink/5"
+            className="-mr-1 flex h-11 w-11 items-center justify-center rounded-full bg-ink/5"
+            aria-label="Закрыть"
           >
             <X size={18} />
           </button>
@@ -262,6 +286,52 @@ export default function AddFood({ onClose, editingEntry }: Props) {
         {/* Меню (редизайн 1b): 2 частых режима крупно + компактная сетка 2×2 */}
         {mode === 'menu' && (
           <div className="flex flex-col gap-4">
+            {/* Недавние — самый быстрый путь, поэтому первым блоком */}
+            {recents.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-muted">
+                  <History size={12} /> Недавние
+                </div>
+                {recents.map((r) => (
+                  <div
+                    key={r.id}
+                    className="flex items-center gap-2 rounded-3xl bg-card p-3 shadow-card"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold">{r.name}</div>
+                      <div className="text-[11px] font-medium text-muted">
+                        {Math.round(r.calories)} ккал · Б {Math.round(r.protein_g)} ·
+                        Ж {Math.round(r.fat_g)} · У {Math.round(r.carbs_g)}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => quickAddRecent(r)}
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ink text-white"
+                      aria-label="Добавить снова"
+                    >
+                      <Plus size={18} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Способы добавления сворачиваем, если вход из секции дневника */}
+            {initialMeal && (
+              <button
+                onClick={() => {
+                  haptic('light')
+                  setModesOpen((v) => !v)
+                }}
+                className="flex items-center gap-2 rounded-3xl bg-card p-4 text-left shadow-card"
+              >
+                <span className="flex-1 text-sm font-semibold">Другие способы</span>
+                <span className="text-muted">{modesOpen ? '⌃' : '⌄'}</span>
+              </button>
+            )}
+
+            {modesOpen && (
+              <>
             <div className="flex flex-col gap-2">
               <ModeButton
                 icon={<Camera size={20} />}
@@ -320,35 +390,7 @@ export default function AddFood({ onClose, editingEntry }: Props) {
                 }}
               />
             </div>
-
-            {/* Недавние — повторное добавление в один тап */}
-            {recents.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-muted">
-                  <History size={12} /> Недавние
-                </div>
-                {recents.map((r) => (
-                  <div
-                    key={r.id}
-                    className="flex items-center gap-2 rounded-3xl bg-card p-3 shadow-card"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold">{r.name}</div>
-                      <div className="text-[11px] font-medium text-muted">
-                        {Math.round(r.calories)} ккал · Б {Math.round(r.protein_g)} ·
-                        Ж {Math.round(r.fat_g)} · У {Math.round(r.carbs_g)}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => quickAddRecent(r)}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-white"
-                      aria-label="Добавить снова"
-                    >
-                      <Plus size={18} />
-                    </button>
-                  </div>
-                ))}
-              </div>
+              </>
             )}
           </div>
         )}

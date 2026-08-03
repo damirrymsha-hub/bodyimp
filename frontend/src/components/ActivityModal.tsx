@@ -67,7 +67,8 @@ export default function ActivityModal({ onClose }: Props) {
           <h2 className="text-lg font-bold">Добавить активность</h2>
           <button
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-ink/5"
+            className="-mr-1 flex h-11 w-11 items-center justify-center rounded-full bg-ink/5"
+            aria-label="Закрыть"
           >
             <X size={18} />
           </button>

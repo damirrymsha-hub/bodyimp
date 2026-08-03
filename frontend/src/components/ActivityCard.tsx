@@ -35,10 +35,10 @@ export default function ActivityCard() {
             haptic('light')
             setShowModal(true)
           }}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-steps/10 text-steps"
+          className="-mr-1 -mt-1 flex h-11 w-11 items-center justify-center rounded-full bg-steps/10 text-steps"
           aria-label="Добавить тренировку"
         >
-          <Plus size={16} />
+          <Plus size={18} />
         </button>
       </div>
       <div className="flex items-baseline gap-1">
@@ -79,10 +79,10 @@ export function ActivityRows() {
               haptic('light')
               removeActivity(a.id)
             }}
-            className="flex h-6 w-6 items-center justify-center rounded-full text-muted hover:bg-ink/10"
+            className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted"
             aria-label="Удалить тренировку"
           >
-            <X size={14} />
+            <X size={16} />
           </button>
         </div>
       ))}

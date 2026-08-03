@@ -1,16 +1,9 @@
-// Строка еды (редизайн 1a): название + мета, ккал числом, ⭐ избранное.
-// Тап по строке — редактирование (там же и удаление записи).
+// Строка еды в дневнике: светофор плотности, название, порция и макросы,
+// ккал и ⭐ избранное. Приём пищи не дублируем — он в заголовке секции.
 import { Star } from 'lucide-react'
-import type { FoodEntry, MealType } from '../types'
+import type { FoodEntry } from '../types'
 import { haptic } from '../lib/telegram'
 import { useUserStore } from '../store/userStore'
-
-const MEAL_LABELS: Record<MealType, string> = {
-  breakfast: 'Завтрак',
-  lunch: 'Обед',
-  dinner: 'Ужин',
-  snack: 'Перекус',
-}
 
 interface Props {
   entry: FoodEntry
@@ -31,6 +24,7 @@ function densityColor(entry: FoodEntry): string | null {
 export default function FoodItem({ entry, onEdit }: Props) {
   const { isFavorite, favoriteByName, addFavorite, removeFavorite } = useUserStore()
   const fav = isFavorite(entry.name)
+  const dot = densityColor(entry)
 
   // Переключить избранное по этой записи (значения берём из записи).
   function toggleFav(e: React.MouseEvent) {
@@ -58,32 +52,30 @@ export default function FoodItem({ entry, onEdit }: Props) {
         haptic('light')
         onEdit(entry)
       }}
-      className="flex cursor-pointer items-center gap-3 rounded-3xl bg-card p-4 shadow-card active:bg-ink/[0.03]"
+      className="flex cursor-pointer items-center gap-2.5 rounded-3xl bg-card p-4 shadow-card active:bg-ink/[0.03]"
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          {densityColor(entry) && (
-            <span
-              className={`h-2 w-2 shrink-0 rounded-full ${densityColor(entry)}`}
-              aria-hidden
-            />
-          )}
+          {dot && <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} aria-hidden />}
           <span className="truncate text-sm font-semibold text-ink">{entry.name}</span>
         </div>
         <div className="mt-0.5 text-[11px] font-medium text-muted">
-          {MEAL_LABELS[entry.meal_type]} · Б {Math.round(entry.protein_g)} · Ж{' '}
-          {Math.round(entry.fat_g)} · У {Math.round(entry.carbs_g)}
+          {entry.portion_size_g ? `${Math.round(entry.portion_size_g)} г · ` : ''}
+          Б {Math.round(entry.protein_g)} · Ж {Math.round(entry.fat_g)} · У{' '}
+          {Math.round(entry.carbs_g)}
         </div>
       </div>
       <div className="text-sm font-bold">{Math.round(entry.calories)}</div>
+      {/* Разделитель, чтобы промах по звезде не открывал редактирование */}
+      <span className="h-6 w-px shrink-0 bg-ink/[0.07]" aria-hidden />
       <button
         onClick={toggleFav}
-        className="flex h-8 w-8 items-center justify-center rounded-full"
-        aria-label="В избранное"
+        className="-mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+        aria-label={fav ? 'Убрать из избранного' : 'В избранное'}
       >
         <Star
-          size={16}
-          className={fav ? 'text-yellow-400' : 'text-ink/20'}
+          size={18}
+          className={fav ? 'text-yellow-400' : 'text-ink/35'}
           fill={fav ? 'currentColor' : 'none'}
         />
       </button>

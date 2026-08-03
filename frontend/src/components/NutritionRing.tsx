@@ -1,4 +1,5 @@
-// SVG-кольцо прогресса с числом в центре (оставшиеся калории).
+// SVG-кольцо прогресса. При переборе нормы рисуется вторая дуга (цвет белков),
+// а число в центре меняет смысл: «осталось» → «сверх нормы».
 interface Props {
   consumed: number
   goal: number
@@ -16,7 +17,13 @@ export default function NutritionRing({
   const circumference = 2 * Math.PI * radius
   const progress = goal > 0 ? Math.min(consumed / goal, 1) : 0
   const dashOffset = circumference * (1 - progress)
-  const remaining = Math.max(Math.round(goal - consumed), 0)
+
+  // Перебор: доля превышения нормы (визуально ограничена одним оборотом).
+  const over = goal > 0 && consumed > goal
+  const overRatio = over ? Math.min((consumed - goal) / goal, 1) : 0
+  const overDash = circumference * overRatio
+
+  const diff = Math.round(goal - consumed)
 
   return (
     <div className="relative inline-flex items-center justify-center">
@@ -30,7 +37,7 @@ export default function NutritionRing({
           stroke="#EDEFF2"
           strokeWidth={stroke}
         />
-        {/* Прогресс */}
+        {/* Прогресс до нормы */}
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -38,15 +45,37 @@ export default function NutritionRing({
           fill="none"
           stroke="#111111"
           strokeWidth={stroke}
-          strokeLinecap="round"
+          strokeLinecap={over ? 'butt' : 'round'}
           strokeDasharray={circumference}
           strokeDashoffset={dashOffset}
           style={{ transition: 'stroke-dashoffset 0.6s ease' }}
         />
+        {/* Дуга перебора поверх заполненного кольца */}
+        {over && (
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="#FF7A59"
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={`${overDash} ${circumference}`}
+            style={{ transition: 'stroke-dasharray 0.6s ease' }}
+          />
+        )}
       </svg>
       <div className="absolute flex flex-col items-center">
-        <span className="text-4xl font-extrabold leading-none">{remaining}</span>
-        <span className="mt-1 text-xs font-medium text-muted">ккал осталось</span>
+        <span
+          className={`text-4xl font-extrabold leading-none ${
+            over ? 'text-[#E05A32]' : ''
+          }`}
+        >
+          {over ? `+${Math.abs(diff)}` : diff}
+        </span>
+        <span className="mt-1 text-xs font-medium text-muted">
+          {over ? 'ккал сверх нормы' : 'ккал осталось'}
+        </span>
       </div>
     </div>
   )

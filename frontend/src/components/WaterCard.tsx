@@ -25,10 +25,10 @@ export default function WaterCard() {
             haptic('light')
             setShowModal(true)
           }}
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-water/10 text-water"
+          className="-mr-1 -mt-1 flex h-11 w-11 items-center justify-center rounded-full bg-water/10 text-water"
           aria-label="Добавить воду"
         >
-          <Plus size={16} />
+          <Plus size={18} />
         </button>
       </div>
       <div className="flex items-baseline gap-1">

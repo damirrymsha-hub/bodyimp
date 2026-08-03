@@ -7,6 +7,7 @@ import { useUIStore } from '../store/uiStore'
 import { updateUser, updateWaterGoal } from '../api/client'
 import { haptic } from '../lib/telegram'
 import { calculateNutrition } from '../utils/nutritionCalc'
+import TabBar from '../components/TabBar'
 import type { Gender, Goal, ActivityLevel } from '../types'
 
 const GOALS: { value: Goal; label: string }[] = [
@@ -108,7 +109,7 @@ export default function Profile() {
   }
 
   return (
-    <div className="min-h-screen px-5 pb-10 pt-6">
+    <div className="min-h-screen px-5 pb-28 pt-6">
       <header className="mb-6 flex items-center gap-3">
         <button
           onClick={() => navigate(-1)}
@@ -305,6 +306,8 @@ export default function Profile() {
           )}
         </div>
       </section>
+
+      <TabBar />
     </div>
   )
 }

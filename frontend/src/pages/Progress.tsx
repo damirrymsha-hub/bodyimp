@@ -8,6 +8,8 @@ import { useUserStore } from '../store/userStore'
 import { useUIStore } from '../store/uiStore'
 import { getWeeklyStats, getWeightHistory, logWeight } from '../api/client'
 import { haptic, hapticSuccess } from '../lib/telegram'
+import { toISODate, todayISO } from '../lib/date'
+import TabBar from '../components/TabBar'
 import type { WeeklyStats, WeightLog } from '../types'
 
 const WEEKDAYS = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ']
@@ -59,7 +61,7 @@ export default function Progress() {
   }
 
   return (
-    <div className="min-h-screen px-5 pb-10 pt-6">
+    <div className="min-h-screen px-5 pb-28 pt-6">
       <div className="flex flex-col gap-4">
         <header className="flex items-center gap-3">
           <button
@@ -81,50 +83,55 @@ export default function Progress() {
           </SegBtn>
         </div>
 
-        {tab === 'cal' && <CaloriesCard weekly={weekly} goal={goal} />}
-
-        {tab === 'weight' && (
+        {/* Калории: график + средние макросы (макросы — это про еду) */}
+        {tab === 'cal' && (
           <>
-            <WeightCard weights={weights} />
+            <CaloriesCard weekly={weekly} goal={goal} />
             <MacrosWeekCard weekly={weekly} user={user} />
           </>
         )}
 
-        {/* Записать вес */}
-        {logging ? (
-          <div className="flex gap-2">
-            <input
-              value={newWeight}
-              onChange={(e) => setNewWeight(e.target.value)}
-              inputMode="decimal"
-              placeholder="Вес, кг"
-              autoFocus
-              className="input flex-1"
-            />
-            <button
-              onClick={() => {
-                haptic('light')
-                saveWeight()
-              }}
-              className="flex h-12 w-12 items-center justify-center rounded-2xl bg-ink text-white"
-              aria-label="Сохранить вес"
-            >
-              <Plus size={20} />
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => {
-              haptic('light')
-              setLogging(true)
-              setTab('weight')
-            }}
-            className="rounded-2xl bg-ink p-4 text-center text-sm font-semibold text-white"
-          >
-            Записать вес
-          </button>
+        {/* Вес: график динамики + запись нового замера */}
+        {tab === 'weight' && (
+          <>
+            <WeightCard weights={weights} />
+            {logging ? (
+              <div className="flex gap-2">
+                <input
+                  value={newWeight}
+                  onChange={(e) => setNewWeight(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="Вес, кг"
+                  autoFocus
+                  className="input flex-1"
+                />
+                <button
+                  onClick={() => {
+                    haptic('light')
+                    saveWeight()
+                  }}
+                  className="flex h-12 w-12 items-center justify-center rounded-2xl bg-ink text-white"
+                  aria-label="Сохранить вес"
+                >
+                  <Plus size={20} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  haptic('light')
+                  setLogging(true)
+                }}
+                className="rounded-2xl bg-ink p-4 text-center text-sm font-semibold text-white"
+              >
+                Записать вес
+              </button>
+            )}
+          </>
         )}
       </div>
+
+      <TabBar />
     </div>
   )
 }
@@ -176,46 +183,74 @@ function CaloriesCard({ weekly, goal }: { weekly: WeeklyStats | null; goal: numb
         </span>
       </div>
 
-      <div className="relative h-36">
-        {/* Пунктир цели */}
-        <div
-          className="absolute inset-x-0 border-t-2 border-dashed border-ink/15"
-          style={{ top: `${goalTop}%` }}
-        />
-        <div className="absolute inset-0 grid grid-cols-7 items-end gap-2.5">
-          {days.map((d, i) => {
-            const h = Math.max((d.calories / maxVal) * 100, 3)
-            const isToday = i === days.length - 1
-            return (
-              <div
-                key={d.date}
-                className={`rounded-full ${isToday ? 'bg-ink' : 'bg-ink/10'}`}
-                style={{ height: `${h}%`, transition: 'height 0.5s ease' }}
-              />
-            )
-          })}
+      {days.length === 0 ? (
+        <div className="py-10 text-center text-sm text-muted">
+          Пока нет записей за неделю
+          <div className="mt-1 text-xs">Добавь еду — здесь появится график</div>
         </div>
-      </div>
+      ) : (
+        <>
+          <div className="relative h-36">
+            {/* Пунктир цели */}
+            <div
+              className="absolute inset-x-0 border-t-2 border-dashed border-ink/15"
+              style={{ top: `${goalTop}%` }}
+            />
+            <div className="absolute inset-0 grid grid-cols-7 items-end gap-2.5">
+              {days.map((d) => {
+                const h = Math.max((d.calories / maxVal) * 100, 3)
+                return (
+                  <div
+                    key={d.date}
+                    className={`rounded-full ${
+                      d.date === todayISO() ? 'bg-ink' : 'bg-ink/10'
+                    }`}
+                    style={{ height: `${h}%`, transition: 'height 0.5s ease' }}
+                  />
+                )
+              })}
+            </div>
+          </div>
 
-      <div className="grid grid-cols-7 gap-2.5 text-center text-[10px] font-semibold text-muted">
-        {days.map((d, i) => {
-          const wd = WEEKDAYS[new Date(d.date + 'T00:00:00').getDay()]
-          return (
-            <span key={d.date} className={i === days.length - 1 ? 'text-ink' : ''}>
-              {wd}
-            </span>
-          )
-        })}
-      </div>
+          <div className="grid grid-cols-7 gap-2.5 text-center text-[10px] font-semibold text-muted">
+            {days.map((d) => {
+              const wd = WEEKDAYS[new Date(d.date + 'T00:00:00').getDay()]
+              return (
+                <span key={d.date} className={d.date === todayISO() ? 'text-ink' : ''}>
+                  {wd}
+                </span>
+              )
+            })}
+          </div>
+        </>
+      )}
     </section>
   )
 }
 
 // ---- Вес: линия с точками (редизайн 1e) ----
 function WeightCard({ weights }: { weights: WeightLog[] }) {
-  const pts = weights.slice(-7)
+  // Берём замеры за последние 30 дней (не «последние 7 записей» — это врало,
+  // когда взвешивания редкие). Подпись динамическая: по фактическому диапазону.
+  const since = new Date()
+  since.setDate(since.getDate() - 30)
+  const sinceISO = toISODate(since)
+  const recent = weights.filter((w) => w.date >= sinceISO)
+  const pts = (recent.length >= 2 ? recent : weights).slice(-10)
+
   const current = pts.length ? pts[pts.length - 1].weight_kg : null
   const delta = pts.length >= 2 ? current! - pts[0].weight_kg : 0
+  const spanDays =
+    pts.length >= 2
+      ? Math.max(
+          1,
+          Math.round(
+            (new Date(pts[pts.length - 1].date + 'T00:00:00').getTime() -
+              new Date(pts[0].date + 'T00:00:00').getTime()) /
+              86400000,
+          ),
+        )
+      : 0
 
   if (current == null) {
     return (
@@ -262,12 +297,14 @@ function WeightCard({ weights }: { weights: WeightLog[] }) {
         {pts.length >= 2 && (
           <span className="rounded-full bg-ink/5 px-3 py-1.5 text-[11px] font-semibold">
             {delta > 0 ? '+' : '−'}
-            {ruW(Math.abs(delta))} за неделю
+            {ruW(Math.abs(delta))} за {spanDays}{' '}
+            {spanDays % 10 === 1 && spanDays % 100 !== 11 ? 'день' : 'дн.'}
           </span>
         )}
       </div>
 
-      <svg width="100%" height="120" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+      {/* Без preserveAspectRatio="none": иначе линия и точки растягиваются */}
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 'auto' }}>
         <path d={d} fill="none" stroke="#111111" strokeWidth="3" strokeLinecap="round" />
         {pts.map((p, i) =>
           i === pts.length - 1 ? (
