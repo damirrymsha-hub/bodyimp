@@ -235,15 +235,25 @@ export default function Home() {
 
       <TabBar />
 
+      {/* key обязателен: без него React переиспользует смонтированный AddFood
+          и сохраняет прежний выбранный приём пищи при повторном открытии. */}
       <AnimatePresence>
         {adding && (
-          <AddFood initialMeal={adding.meal} onClose={() => setAdding(null)} />
+          <AddFood
+            key={`add-${adding.meal ?? 'any'}`}
+            initialMeal={adding.meal}
+            onClose={() => setAdding(null)}
+          />
         )}
         {showYesterday && (
-          <YesterdayModal onClose={() => setShowYesterday(false)} />
+          <YesterdayModal key="yesterday" onClose={() => setShowYesterday(false)} />
         )}
         {editing && (
-          <AddFood editingEntry={editing} onClose={() => setEditing(null)} />
+          <AddFood
+            key={`edit-${editing.id}`}
+            editingEntry={editing}
+            onClose={() => setEditing(null)}
+          />
         )}
       </AnimatePresence>
     </div>

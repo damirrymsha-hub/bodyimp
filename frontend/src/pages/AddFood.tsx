@@ -93,7 +93,9 @@ export default function AddFood({ onClose, editingEntry, initialMeal }: Props) {
   async function quickAddRecent(entry: FoodEntry) {
     haptic('light')
     await addFood({
-      meal_type: entry.meal_type, // тот же приём пищи, что и в прошлый раз
+      // Приём пищи берём ВЫБРАННЫЙ сейчас, а не тот, что был у записи раньше:
+      // иначе «+» на завтраке добавлял бы блюдо в обед, если раньше его ели там.
+      meal_type: meal,
       name: entry.name,
       calories: entry.calories,
       protein_g: entry.protein_g,
@@ -266,22 +268,24 @@ export default function AddFood({ onClose, editingEntry, initialMeal }: Props) {
           </button>
         </div>
 
-        {/* Выбор приёма пищи (виден во всех режимах кроме меню) */}
-        {mode !== 'menu' && (
-          <div className="no-scrollbar mb-4 flex gap-2 overflow-x-auto">
-            {MEALS.map((m) => (
-              <button
-                key={m.value}
-                onClick={() => setMeal(m.value)}
-                className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ${
-                  meal === m.value ? 'bg-ink text-white' : 'bg-card text-ink'
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Выбор приёма пищи. В меню тоже показываем: оттуда есть быстрое
+            добавление «Недавних», и приём пищи не должен выбираться вслепую. */}
+        <div className="no-scrollbar mb-4 flex gap-2 overflow-x-auto">
+          {MEALS.map((m) => (
+            <button
+              key={m.value}
+              onClick={() => {
+                haptic('light')
+                setMeal(m.value)
+              }}
+              className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ${
+                meal === m.value ? 'bg-ink text-white' : 'bg-card text-ink shadow-card'
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
 
         {/* Меню (редизайн 1b): 2 частых режима крупно + компактная сетка 2×2 */}
         {mode === 'menu' && (
