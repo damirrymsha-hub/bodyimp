@@ -5,12 +5,13 @@
 """
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import AnalysisFeedback
 import schemas
+from services import authz
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +20,13 @@ router = APIRouter(prefix="/api/feedback", tags=["feedback"])
 
 @router.post("/analysis")
 def save_analysis_feedback(
-    payload: schemas.AnalysisFeedbackIn, db: Session = Depends(get_db)
+    payload: schemas.AnalysisFeedbackIn, request: Request, db: Session = Depends(get_db)
 ):
     """Сохраняет пару «ответ ИИ → финальное значение пользователя»."""
-    fb = AnalysisFeedback(**payload.model_dump())
+    # user_id не доверяем клиенту — берём из авторизации.
+    data = payload.model_dump()
+    data["user_id"] = authz.current_user(request, db).id
+    fb = AnalysisFeedback(**data)
     db.add(fb)
     db.commit()
     return {"success": True, "id": fb.id}

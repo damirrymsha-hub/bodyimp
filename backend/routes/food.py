@@ -3,19 +3,21 @@
 """
 from datetime import date as date_cls
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from database import get_db
 import models
 import schemas
+from services import authz
 
 router = APIRouter(prefix="/api/food", tags=["food"])
 
 
 @router.post("/add", response_model=schemas.FoodOut)
-def add_food(payload: schemas.FoodAdd, db: Session = Depends(get_db)):
+def add_food(payload: schemas.FoodAdd, request: Request, db: Session = Depends(get_db)):
     """Добавляет запись о приёме пищи."""
+    authz.require_user_id(request, db, payload.user_id)
     entry = models.FoodEntry(
         user_id=payload.user_id,
         date=payload.date or date_cls.today(),
@@ -36,11 +38,12 @@ def add_food(payload: schemas.FoodAdd, db: Session = Depends(get_db)):
 
 
 @router.post("/copy-day", response_model=list[schemas.FoodOut])
-def copy_day(payload: schemas.CopyDayIn, db: Session = Depends(get_db)):
+def copy_day(payload: schemas.CopyDayIn, request: Request, db: Session = Depends(get_db)):
     """
     Копирует все записи еды с одного дня на другой («Повторить вчера»).
     Возвращает созданные записи; 404 — если день-источник пуст.
     """
+    authz.require_user_id(request, db, payload.user_id)
     src = (
         db.query(models.FoodEntry)
         .filter(
@@ -78,10 +81,12 @@ def copy_day(payload: schemas.CopyDayIn, db: Session = Depends(get_db)):
 @router.get("/recent/{user_id}", response_model=list[schemas.FoodOut])
 def recent_foods(
     user_id: int,
+    request: Request,
     limit: int = Query(default=8, le=20),
     db: Session = Depends(get_db),
 ):
     """Недавние блюда без повторов по названию (для быстрого повторного добавления)."""
+    authz.require_user_id(request, db, user_id)
     rows = (
         db.query(models.FoodEntry)
         .filter(models.FoodEntry.user_id == user_id)
@@ -105,10 +110,12 @@ def recent_foods(
 @router.get("/today/{user_id}", response_model=list[schemas.FoodOut])
 def get_today(
     user_id: int,
+    request: Request,
     date: str = Query(default=None, description="Дата YYYY-MM-DD (по умолчанию сегодня)"),
     db: Session = Depends(get_db),
 ):
     """Возвращает записи питания за указанную дату (или за сегодня)."""
+    authz.require_user_id(request, db, user_id)
     if date:
         try:
             target = date_cls.fromisoformat(date)
@@ -131,10 +138,12 @@ def get_today(
 @router.get("/history/{user_id}", response_model=list[schemas.FoodOut])
 def get_history(
     user_id: int,
+    request: Request,
     date: str = Query(..., description="Дата в формате YYYY-MM-DD"),
     db: Session = Depends(get_db),
 ):
     """Возвращает записи питания за указанную дату."""
+    authz.require_user_id(request, db, user_id)
     try:
         target = date_cls.fromisoformat(date)
     except ValueError:
@@ -155,12 +164,13 @@ def get_history(
 def update_food(
     entry_id: int,
     payload: schemas.FoodUpdate,
-    db: Session = Depends(get_db),
+    request: Request, db: Session = Depends(get_db),
 ):
     """Обновляет существующую запись питания (режим редактирования)."""
     entry = db.query(models.FoodEntry).filter(models.FoodEntry.id == entry_id).first()
     if entry is None:
         raise HTTPException(status_code=404, detail="Запись не найдена")
+    authz.require_user_id(request, db, entry.user_id)
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         if field == "base_per_100g":
@@ -173,11 +183,12 @@ def update_food(
 
 
 @router.delete("/{entry_id}")
-def delete_food(entry_id: int, db: Session = Depends(get_db)):
+def delete_food(entry_id: int, request: Request, db: Session = Depends(get_db)):
     """Удаляет запись питания по id."""
     entry = db.query(models.FoodEntry).filter(models.FoodEntry.id == entry_id).first()
     if entry is None:
         raise HTTPException(status_code=404, detail="Запись не найдена")
+    authz.require_user_id(request, db, entry.user_id)
     db.delete(entry)
     db.commit()
     return {"status": "deleted", "id": entry_id}

@@ -1,19 +1,21 @@
 """
 Роут целей: ручной просмотр/пересчёт дневных норм КБЖУ.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from database import get_db
 import models
+from services import authz
 from services.nutrition_calc import calculate_nutrition
 
 router = APIRouter(prefix="/api/goals", tags=["goals"])
 
 
 @router.get("/{telegram_id}")
-def get_goals(telegram_id: int, db: Session = Depends(get_db)):
+def get_goals(telegram_id: int, request: Request, db: Session = Depends(get_db)):
     """Возвращает текущие дневные нормы пользователя."""
+    authz.require_tid(request, telegram_id)
     user = (
         db.query(models.User)
         .filter(models.User.telegram_id == telegram_id)
@@ -32,8 +34,9 @@ def get_goals(telegram_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{telegram_id}/recalculate")
-def recalculate_goals(telegram_id: int, db: Session = Depends(get_db)):
+def recalculate_goals(telegram_id: int, request: Request, db: Session = Depends(get_db)):
     """Принудительно пересчитывает нормы на основе текущих данных профиля."""
+    authz.require_tid(request, telegram_id)
     user = (
         db.query(models.User)
         .filter(models.User.telegram_id == telegram_id)

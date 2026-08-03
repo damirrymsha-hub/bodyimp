@@ -1,21 +1,46 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useUserStore } from './store/userStore'
 import { getTelegramUser } from './lib/telegram'
+import { getSession } from './lib/auth'
 import Home from './pages/Home'
+import Login from './pages/Login'
 import Onboarding from './pages/Onboarding'
 import Profile from './pages/Profile'
 import Progress from './pages/Progress'
 import Toasts from './components/Toasts'
 
+interface Identity {
+  id: number
+  username: string | null
+}
+
+// Кто пользователь: внутри Telegram — из initData (в dev — заглушка),
+// в браузере — из сохранённой PWA-сессии. null → экран входа.
+function resolveIdentity(): Identity | null {
+  const tg = getTelegramUser()
+  if (tg) return tg
+  const session = getSession()
+  if (session) return { id: session.telegramId, username: session.username }
+  return null
+}
+
 export default function App() {
   const { user, loading, init } = useUserStore()
+  const [identity, setIdentity] = useState<Identity | null>(resolveIdentity)
 
-  // При старте инициализируем профиль по telegram_id.
+  const handleLoggedIn = useCallback(
+    (id: number, username: string | null) => setIdentity({ id, username }),
+    [],
+  )
+
   useEffect(() => {
-    const tg = getTelegramUser()
-    init(tg.id, tg.username)
-  }, [init])
+    if (identity) init(identity.id, identity.username)
+  }, [identity, init])
+
+  if (!identity) {
+    return <Login onLoggedIn={handleLoggedIn} />
+  }
 
   if (loading && !user) {
     return (

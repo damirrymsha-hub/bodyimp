@@ -11,14 +11,36 @@ export function initTelegram() {
   }
 }
 
-// Возвращает telegram_id текущего пользователя.
-// Вне Telegram (dev) — фиктивный id, чтобы приложение работало локально.
-export function getTelegramUser() {
+// Открыто ли приложение внутри Telegram (есть подписанный initData).
+export function isInTelegram(): boolean {
+  try {
+    return Boolean(WebApp.initData)
+  } catch {
+    return false
+  }
+}
+
+// Подписанная строка initData — уходит на бэкенд в каждом запросе Mini App.
+export function getInitData(): string {
+  try {
+    return WebApp.initData ?? ''
+  } catch {
+    return ''
+  }
+}
+
+// Возвращает telegram_id текущего пользователя (только внутри Telegram).
+// Фиктивный dev-пользователь остаётся ТОЛЬКО в локальной разработке —
+// в проде вне Telegram работает экран входа (PWA).
+export function getTelegramUser(): { id: number; username: string | null } | null {
   const user = WebApp.initDataUnsafe?.user
   if (user) {
     return { id: user.id, username: user.username ?? null }
   }
-  return { id: 99000001, username: 'dev_user' }
+  if (import.meta.env.DEV) {
+    return { id: 99000001, username: 'dev_user' }
+  }
+  return null
 }
 
 // Платформа Telegram: "android" | "ios" | "tdesktop" | "weba" | "unknown" и т.п.

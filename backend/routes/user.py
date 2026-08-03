@@ -6,13 +6,14 @@
 from datetime import date as date_cls, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
 import models
 import schemas
+from services import authz
 from services.nutrition_calc import (
     calculate_nutrition,
     estimate_tdee_from_logs,
@@ -141,8 +142,11 @@ def _user_out(user: models.User, result: Optional[NutritionResult]) -> schemas.U
 
 
 @router.post("/register", response_model=schemas.UserOut)
-def register_user(payload: schemas.UserRegister, db: Session = Depends(get_db)):
+def register_user(
+    payload: schemas.UserRegister, request: Request, db: Session = Depends(get_db)
+):
     """Регистрирует пользователя по telegram_id (или обновляет существующего)."""
+    authz.require_tid(request, payload.telegram_id)
     user = (
         db.query(models.User)
         .filter(models.User.telegram_id == payload.telegram_id)
@@ -165,8 +169,9 @@ def register_user(payload: schemas.UserRegister, db: Session = Depends(get_db)):
 
 
 @router.get("/{telegram_id}", response_model=schemas.UserOut)
-def get_user(telegram_id: int, db: Session = Depends(get_db)):
+def get_user(telegram_id: int, request: Request, db: Session = Depends(get_db)):
     """Возвращает профиль. Заодно раз в неделю обновляет адаптивную норму."""
+    authz.require_tid(request, telegram_id)
     user = (
         db.query(models.User)
         .filter(models.User.telegram_id == telegram_id)
@@ -187,9 +192,11 @@ def get_user(telegram_id: int, db: Session = Depends(get_db)):
 def update_user(
     telegram_id: int,
     payload: schemas.UserUpdate,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """Обновляет данные пользователя и пересчитывает нормы."""
+    authz.require_tid(request, telegram_id)
     user = (
         db.query(models.User)
         .filter(models.User.telegram_id == telegram_id)
@@ -211,9 +218,11 @@ def update_user(
 def update_water_goal(
     telegram_id: int,
     payload: schemas.WaterGoalUpdate,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """Ручная установка дневной нормы воды (500–5000 мл)."""
+    authz.require_tid(request, telegram_id)
     if payload.ml < 500 or payload.ml > 5000:
         raise HTTPException(400, "Норма воды должна быть от 500 до 5000 мл")
 

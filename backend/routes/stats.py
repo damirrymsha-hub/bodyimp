@@ -3,20 +3,22 @@
 """
 from datetime import date as date_cls, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
 import models
 import schemas
+from services import authz
 
 router = APIRouter(prefix="/api", tags=["stats"])
 
 
 @router.get("/stats/weekly/{user_id}", response_model=schemas.WeeklyStats)
-def weekly_stats(user_id: int, db: Session = Depends(get_db)):
+def weekly_stats(user_id: int, request: Request, db: Session = Depends(get_db)):
     """Возвращает суммарные калории за каждый из последних 7 дней."""
+    authz.require_user_id(request, db, user_id)
     today = date_cls.today()
     start = today - timedelta(days=6)
 
@@ -69,11 +71,12 @@ def weekly_stats(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/stats/streak/{user_id}")
-def streak(user_id: int, db: Session = Depends(get_db)):
+def streak(user_id: int, request: Request, db: Session = Depends(get_db)):
     """
     Стрик дневника: сколько дней подряд есть хотя бы одна запись еды.
     Если сегодня ещё пусто — считаем от вчера (стрик не сгорает днём).
     """
+    authz.require_user_id(request, db, user_id)
     dates = {
         row[0]
         for row in db.query(models.FoodEntry.date)
@@ -94,8 +97,9 @@ def streak(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/weight/log", response_model=schemas.WeightOut)
-def log_weight(payload: schemas.WeightLogIn, db: Session = Depends(get_db)):
+def log_weight(payload: schemas.WeightLogIn, request: Request, db: Session = Depends(get_db)):
     """Сохраняет замер веса. Также обновляет текущий вес в профиле."""
+    authz.require_user_id(request, db, payload.user_id)
     target = payload.date or date_cls.today()
     entry = models.WeightLog(
         user_id=payload.user_id,
@@ -115,8 +119,9 @@ def log_weight(payload: schemas.WeightLogIn, db: Session = Depends(get_db)):
 
 
 @router.get("/weight/history/{user_id}", response_model=list[schemas.WeightOut])
-def weight_history(user_id: int, db: Session = Depends(get_db)):
+def weight_history(user_id: int, request: Request, db: Session = Depends(get_db)):
     """Возвращает историю замеров веса (по возрастанию даты)."""
+    authz.require_user_id(request, db, user_id)
     return (
         db.query(models.WeightLog)
         .filter(models.WeightLog.user_id == user_id)

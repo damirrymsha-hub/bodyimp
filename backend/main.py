@@ -13,13 +13,18 @@ from datetime import datetime, timedelta, timezone, date as date_cls
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from database import init_db
 from routes import (
     user, food, analyze, water, stats, goals, activity,
-    favorites, food_search, barcode, feedback,
+    favorites, food_search, barcode, feedback, auth,
 )
-from services.telegram_auth import verify_init_data
+from services.telegram_auth import (
+    verify_init_data,
+    init_data_telegram_id,
+    jwt_telegram_id,
+)
 
 load_dotenv()
 
@@ -28,7 +33,66 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "")
 # Режим разработки определяем по наличию dev-флага.
 IS_DEV = os.getenv("ENV", "dev").lower() != "production"
 
-app = FastAPI(title=f"{APP_NAME} API")
+# В проде документация API закрыта (не светим карту эндпоинтов).
+app = FastAPI(
+    title=f"{APP_NAME} API",
+    docs_url="/docs" if IS_DEV else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if IS_DEV else None,
+)
+
+# Пути без аутентификации: health, вебхук бота (свой секрет), вход, инфо о боте.
+PUBLIC_API_PATHS = {
+    "/api/bot/webhook",
+    "/api/auth/telegram-login",
+    "/api/auth/bot-info",
+}
+
+
+# ВАЖНО: middleware добавлен ДО CORSMiddleware, чтобы CORS был внешним слоем
+# и навешивал заголовки в том числе на наши 401-ответы.
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    """
+    Аутентификация всех /api/*:
+    - Mini App шлёт подписанный Telegram initData в X-Telegram-Init-Data;
+    - PWA шлёт JWT в Authorization: Bearer (выдан после Login Widget);
+    - в dev-режиме без заголовков подставляется тестовый пользователь.
+    telegram_id кладётся в request.state — роуты сверяют владение (services/authz).
+    """
+    path = request.url.path
+    if (
+        request.method == "OPTIONS"
+        or not path.startswith("/api")
+        or path in PUBLIC_API_PATHS
+    ):
+        return await call_next(request)
+
+    tid: int | None = None
+    init_data = request.headers.get("X-Telegram-Init-Data", "")
+    if init_data:
+        tid = init_data_telegram_id(init_data)
+    else:
+        authz = request.headers.get("Authorization", "")
+        if authz.startswith("Bearer "):
+            tid = jwt_telegram_id(authz[7:])
+
+    if tid is None and IS_DEV:
+        # Локальная разработка и тесты — без подписи, с явным дев-идентификатором.
+        try:
+            tid = int(request.headers.get("X-Dev-Telegram-Id", "99000001"))
+        except ValueError:
+            tid = 99000001
+
+    if tid is None:
+        return JSONResponse(
+            {"detail": "Не авторизован: откройте приложение через Telegram"},
+            status_code=401,
+        )
+
+    request.state.telegram_id = tid
+    return await call_next(request)
+
 
 # CORS: в разработке разрешаем всё, в проде — только фронтенд.
 allowed_origins = ["*"] if IS_DEV else [FRONTEND_URL]
@@ -52,6 +116,7 @@ app.include_router(favorites.router)
 app.include_router(food_search.router)
 app.include_router(barcode.router)
 app.include_router(feedback.router)
+app.include_router(auth.router)
 
 
 @app.api_route("/", methods=["GET", "HEAD"])

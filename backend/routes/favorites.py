@@ -1,10 +1,11 @@
 """
 Роуты раздела «Избранное»: список, добавление, удаление продуктов пользователя.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from database import get_db
+from services import authz
 from models import FavoriteFood
 from schemas import FavoriteFoodCreate, FavoriteFoodOut
 
@@ -12,8 +13,9 @@ router = APIRouter(prefix="/api/favorites", tags=["favorites"])
 
 
 @router.get("/{user_id}", response_model=list[FavoriteFoodOut])
-async def get_favorites(user_id: int, db: Session = Depends(get_db)):
+async def get_favorites(user_id: int, request: Request, db: Session = Depends(get_db)):
     """Все избранные продукты пользователя (новые сверху)."""
+    authz.require_user_id(request, db, user_id)
     return (
         db.query(FavoriteFood)
         .filter(FavoriteFood.user_id == user_id)
@@ -24,9 +26,10 @@ async def get_favorites(user_id: int, db: Session = Depends(get_db)):
 
 @router.post("/{user_id}", response_model=FavoriteFoodOut)
 async def add_favorite(
-    user_id: int, data: FavoriteFoodCreate, db: Session = Depends(get_db)
+    user_id: int, data: FavoriteFoodCreate, request: Request, db: Session = Depends(get_db)
 ):
     """Добавляет продукт в избранное (без дублей по имени)."""
+    authz.require_user_id(request, db, user_id)
     exists = (
         db.query(FavoriteFood)
         .filter(FavoriteFood.user_id == user_id, FavoriteFood.name == data.name)
@@ -43,9 +46,10 @@ async def add_favorite(
 
 @router.delete("/{user_id}/{food_id}")
 async def remove_favorite(
-    user_id: int, food_id: int, db: Session = Depends(get_db)
+    user_id: int, food_id: int, request: Request, db: Session = Depends(get_db)
 ):
     """Удаляет продукт из избранного."""
+    authz.require_user_id(request, db, user_id)
     fav = (
         db.query(FavoriteFood)
         .filter(FavoriteFood.id == food_id, FavoriteFood.user_id == user_id)

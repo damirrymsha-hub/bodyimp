@@ -19,12 +19,80 @@ import type {
   PortionType,
 } from '../types'
 
+import { getInitData } from '../lib/telegram'
+import { clearSession, getSession } from '../lib/auth'
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export const api = axios.create({
   baseURL: API_URL,
   headers: { 'Content-Type': 'application/json' },
 })
+
+// Аутентификация каждого запроса:
+// - внутри Telegram — подписанный initData (бэкенд проверяет HMAC);
+// - в браузере (PWA) — JWT, выданный после входа через Login Widget.
+api.interceptors.request.use((config) => {
+  const initData = getInitData()
+  if (initData) {
+    config.headers['X-Telegram-Init-Data'] = initData
+  } else {
+    const session = getSession()
+    if (session) config.headers['Authorization'] = `Bearer ${session.token}`
+  }
+  return config
+})
+
+// Протухший/битый JWT в PWA → сбрасываем сессию и уводим на экран входа.
+api.interceptors.response.use(
+  (r) => r,
+  (error) => {
+    if (
+      error?.response?.status === 401 &&
+      !getInitData() &&
+      getSession() !== null
+    ) {
+      clearSession()
+      window.location.reload()
+    }
+    return Promise.reject(error)
+  },
+)
+
+// ---------- Аутентификация (PWA) ----------
+// Данные, которые Telegram Login Widget передаёт в onauth-колбэк.
+export interface LoginWidgetUser {
+  id: number
+  first_name?: string
+  last_name?: string
+  username?: string
+  photo_url?: string
+  auth_date: number
+  hash: string
+}
+
+export interface LoginResponse {
+  token: string
+  telegram_id: number
+  username: string | null
+  needs_onboarding: boolean
+}
+
+export async function telegramLogin(
+  widgetUser: LoginWidgetUser,
+): Promise<LoginResponse> {
+  const { data } = await api.post<LoginResponse>(
+    '/api/auth/telegram-login',
+    widgetUser,
+  )
+  return data
+}
+
+// Username бота — нужен виджету входа (data-telegram-login).
+export async function getBotInfo(): Promise<{ username: string }> {
+  const { data } = await api.get<{ username: string }>('/api/auth/bot-info')
+  return data
+}
 
 // ---------- Пользователь ----------
 export interface RegisterPayload {
