@@ -30,7 +30,9 @@ def current_user(request: Request, db: Session) -> models.User:
         .first()
     )
     if user is None:
-        raise HTTPException(401, "Профиль не найден — пройдите регистрацию")
+        # Именно 404, а не 401: аутентификация прошла, просто профиля ещё нет.
+        # На 401 фронтенд сбрасывает сессию PWA — получился бы цикл входа.
+        raise HTTPException(404, "Профиль не найден — пройдите регистрацию")
     return user
 
 
