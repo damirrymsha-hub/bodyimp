@@ -30,36 +30,59 @@ JWT_SECRET = (
 )
 JWT_TTL_SECONDS = 30 * 24 * 3600  # сессия PWA — 30 дней
 
-# Свежесть подписей Telegram (initData перевыпускается при каждом открытии).
-INIT_DATA_MAX_AGE = 48 * 3600
+# Свежесть подписей Telegram. initData перевыпускается при каждом открытии,
+# но iOS держит мини-приложение в фоне сутками и возвращает старый initData —
+# поэтому окно широкое, иначе живой пользователь ловит 401 на ровном месте.
+INIT_DATA_MAX_AGE = 30 * 24 * 3600
 WIDGET_MAX_AGE = 24 * 3600
+
+
+def _parse_init_data(init_data: str) -> dict[str, str]:
+    """
+    Разбирает initData в словарь.
+    keep_blank_values=True обязателен: клиенты Telegram присылают часть полей
+    пустыми (например signature=), и они участвуют в подписи — если их
+    потерять, хэш не сойдётся и живой пользователь получит 401.
+    """
+    return dict(parse_qsl(init_data, keep_blank_values=True))
 
 
 def verify_init_data(init_data: str) -> bool:
     """Проверяет подлинность строки initData из Telegram WebApp."""
-    if not init_data or not BOT_TOKEN:
-        return False
+    return _check_init_data(init_data)[0]
 
-    try:
-        parsed = dict(parse_qsl(init_data, strict_parsing=True))
-    except ValueError:
-        return False
 
-    received_hash = parsed.pop("hash", None)
+def _check_init_data(init_data: str) -> tuple[bool, str]:
+    """Как verify_init_data, но возвращает ещё и причину отказа (для логов)."""
+    if not init_data:
+        return False, "no_init_data"
+    if not BOT_TOKEN:
+        return False, "no_bot_token"
+
+    parsed = _parse_init_data(init_data)
+    received_hash = parsed.pop("hash", "")
     if not received_hash:
-        return False
+        return False, "no_hash"
 
-    data_check_string = "\n".join(
-        f"{key}={value}" for key, value in sorted(parsed.items())
-    )
     secret_key = hmac.new(
         b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256
     ).digest()
-    calculated_hash = hmac.new(
-        secret_key, data_check_string.encode(), hashlib.sha256
-    ).hexdigest()
 
-    return hmac.compare_digest(calculated_hash, received_hash)
+    # Разные версии клиентов по-разному учитывают поле signature (его добавили
+    # для сторонней Ed25519-проверки). Принимаем оба варианта строки подписи.
+    for excluded in ((), ("signature",)):
+        data_check_string = "\n".join(
+            f"{key}={value}"
+            for key, value in sorted(parsed.items())
+            if key not in excluded
+        )
+        calculated_hash = hmac.new(
+            secret_key, data_check_string.encode(), hashlib.sha256
+        ).hexdigest()
+        if hmac.compare_digest(calculated_hash, received_hash):
+            return True, "ok"
+
+    return False, "bad_signature"
 
 
 def init_data_telegram_id(init_data: str) -> int | None:
@@ -67,18 +90,23 @@ def init_data_telegram_id(init_data: str) -> int | None:
     Полная проверка initData: подпись + свежесть auth_date.
     Возвращает telegram_id пользователя либо None.
     """
-    if not verify_init_data(init_data):
-        return None
+    return init_data_telegram_id_verbose(init_data)[0]
+
+
+def init_data_telegram_id_verbose(init_data: str) -> tuple[int | None, str]:
+    """Как init_data_telegram_id, но с кодом причины отказа для логов и ответа."""
+    ok, reason = _check_init_data(init_data)
+    if not ok:
+        return None, reason
     try:
-        parsed = dict(parse_qsl(init_data))
+        parsed = _parse_init_data(init_data)
         auth_date = int(parsed.get("auth_date", "0"))
         if auth_date and time.time() - auth_date > INIT_DATA_MAX_AGE:
-            return None
+            return None, "stale"
         user = json.loads(parsed.get("user", "{}"))
-        tid = int(user["id"])
-        return tid
+        return int(user["id"]), "ok"
     except (ValueError, KeyError, json.JSONDecodeError):
-        return None
+        return None, "malformed_user"
 
 
 def verify_login_widget(data: dict) -> int | None:

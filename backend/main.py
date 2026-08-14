@@ -8,6 +8,7 @@
 import os
 import asyncio
 import contextlib
+import logging
 from datetime import datetime, timedelta, timezone, date as date_cls
 
 from dotenv import load_dotenv
@@ -22,11 +23,13 @@ from routes import (
 )
 from services.telegram_auth import (
     verify_init_data,
-    init_data_telegram_id,
+    init_data_telegram_id_verbose,
     jwt_telegram_id,
 )
 
 load_dotenv()
+
+logger = logging.getLogger("bodyimp.auth")
 
 APP_NAME = os.getenv("APP_NAME", "BodyImp")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "")
@@ -69,13 +72,15 @@ async def auth_middleware(request: Request, call_next):
         return await call_next(request)
 
     tid: int | None = None
+    reason = "no_credentials"
     init_data = request.headers.get("X-Telegram-Init-Data", "")
     if init_data:
-        tid = init_data_telegram_id(init_data)
+        tid, reason = init_data_telegram_id_verbose(init_data)
     else:
         authz = request.headers.get("Authorization", "")
         if authz.startswith("Bearer "):
             tid = jwt_telegram_id(authz[7:])
+            reason = "ok" if tid else "bad_jwt"
 
     if tid is None and IS_DEV:
         # Локальная разработка и тесты — без подписи, с явным дев-идентификатором.
@@ -85,8 +90,19 @@ async def auth_middleware(request: Request, call_next):
             tid = 99000001
 
     if tid is None:
+        # Пишем причину в лог: без неё «не работает у друга» не диагностируется.
+        logger.warning(
+            "auth reject %s %s: %s (len=%d)",
+            request.method,
+            path,
+            reason,
+            len(init_data),
+        )
         return JSONResponse(
-            {"detail": "Не авторизован: откройте приложение через Telegram"},
+            {
+                "detail": "Не авторизован: откройте приложение через Telegram",
+                "reason": reason,
+            },
             status_code=401,
         )
 

@@ -28,6 +28,7 @@ import {
   type FavoriteAddPayload,
 } from '../api/client'
 import { enqueueFood, flushQueue } from '../lib/offlineQueue'
+import { apiErrorMessage } from '../lib/errors'
 import { todayISO } from '../lib/date'
 
 export interface Totals {
@@ -88,15 +89,19 @@ export const useUserStore = create<UserState>((set, get) => ({
       let user: User
       try {
         user = await getUser(telegramId)
-      } catch {
+      } catch (err) {
+        // Регистрируем только если профиля действительно нет (404).
+        // На 401/403/сетевой сбой повторный запрос бессмысленен — пробрасываем.
+        const status = (err as { response?: { status: number } })?.response?.status
+        if (status !== 404) throw err
         user = await registerUser({ telegram_id: telegramId, username })
       }
       set({ user })
       await flushQueue() // досылаем оффлайн-очередь
       await get().loadDay(todayISO())
       await get().loadFavorites()
-    } catch {
-      set({ error: 'Не удалось подключиться к серверу' })
+    } catch (err) {
+      set({ error: apiErrorMessage(err, 'Не удалось подключиться к серверу') })
     } finally {
       set({ loading: false })
     }

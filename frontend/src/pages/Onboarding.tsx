@@ -5,8 +5,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronRight, ChevronLeft, Check } from 'lucide-react'
 import { useUserStore } from '../store/userStore'
 import { useUIStore } from '../store/uiStore'
-import { updateUser } from '../api/client'
+import { registerUser, updateUser } from '../api/client'
 import { haptic, hapticSuccess } from '../lib/telegram'
+import { apiErrorMessage } from '../lib/errors'
 import type { Gender, Goal, ActivityLevel, User } from '../types'
 
 const ACTIVITIES: { value: ActivityLevel; label: string; desc: string }[] = [
@@ -64,22 +65,34 @@ export default function Onboarding() {
   async function calculate() {
     if (!telegramId) return
     setSaving(true)
+    const profile = {
+      gender: gender!,
+      age: Number(age),
+      height_cm: Number(height),
+      weight_kg: Number(weight),
+      activity_level: activity!,
+      goal: goal!,
+      notifications_enabled: notify,
+      adaptive_tdee: adaptive,
+    }
     try {
-      const user = await updateUser(telegramId, {
-        gender: gender!,
-        age: Number(age),
-        height_cm: Number(height),
-        weight_kg: Number(weight),
-        activity_level: activity!,
-        goal: goal!,
-        notifications_enabled: notify,
-        adaptive_tdee: adaptive,
-      })
+      let user: User
+      try {
+        user = await updateUser(telegramId, profile)
+      } catch (err) {
+        // Профиль мог не создаться при старте (сбой сети) — создаём здесь.
+        const status = (err as { response?: { status: number } })?.response?.status
+        if (status !== 404) throw err
+        user = await registerUser({ telegram_id: telegramId, ...profile })
+      }
       setUser(user)
       setResult(user)
       setStep(5)
-    } catch {
-      showToast('Не удалось рассчитать нормы. Проверьте соединение.', 'error')
+    } catch (err) {
+      showToast(
+        apiErrorMessage(err, 'Не удалось рассчитать нормы. Попробуйте ещё раз.'),
+        'error',
+      )
     } finally {
       setSaving(false)
     }
