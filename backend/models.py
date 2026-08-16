@@ -5,6 +5,7 @@ ORM-модели BodyImp.
 from datetime import datetime, date
 
 from sqlalchemy import (
+    BigInteger,
     Column,
     Integer,
     String,
@@ -25,7 +26,11 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    telegram_id = Column(Integer, unique=True, index=True, nullable=False)
+    # ОБЯЗАТЕЛЬНО BigInteger: у аккаунтов, зарегистрированных в Telegram
+    # недавно, идентификатор превышает 2 147 483 647 (предел INTEGER в
+    # Postgres), и вставка такой строки падала с ошибкой 500. В SQLite целые
+    # 64-битные, поэтому локальные тесты проблему не показывали.
+    telegram_id = Column(BigInteger, unique=True, index=True, nullable=False)
     username = Column(String, nullable=True)
 
     # Антропометрия и цели

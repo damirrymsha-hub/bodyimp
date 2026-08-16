@@ -64,6 +64,14 @@ def _ensure_columns():
         },
     }
 
+    # Изменения типа уже существующих колонок (create_all их не трогает).
+    # Только для Postgres: в SQLite тип колонки не фиксирован, а ALTER COLUMN
+    # он и не поддерживает.
+    type_migrations = [
+        # Идентификаторы новых аккаунтов Telegram не помещаются в INTEGER.
+        "ALTER TABLE users ALTER COLUMN telegram_id TYPE BIGINT",
+    ]
+
     is_sqlite = DATABASE_URL.startswith("sqlite")
     with engine.begin() as conn:
         for table, columns in migrations.items():
@@ -85,6 +93,12 @@ def _ensure_columns():
                             f"ADD COLUMN IF NOT EXISTS {col} {ddl}"
                         )
                     )
+
+    if not is_sqlite:
+        for statement in type_migrations:
+            # Повторный запуск безопасен: смена типа на тот же — no-op.
+            with engine.begin() as conn:
+                conn.execute(text(statement))
 
 
 def init_db():
