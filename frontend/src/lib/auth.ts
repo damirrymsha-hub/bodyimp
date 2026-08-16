@@ -1,5 +1,8 @@
-// Сессия PWA (вход через Telegram Login Widget): JWT + данные пользователя
-// хранятся в localStorage и переживают перезапуск браузера.
+// Сессия PWA (вход через Telegram Login Widget) и мини-приложения:
+// JWT + данные пользователя. Живёт 30 дней и не зависит от адресной строки.
+// Доступ к хранилищу — только через storage.ts: прямой localStorage умеет
+// бросать исключения в WebView и ронять запросы (см. lib/storage.ts).
+import { readStored, removeStored, writeStored } from './storage'
 
 const JWT_KEY = 'bodyimp_jwt'
 const TID_KEY = 'bodyimp_tid'
@@ -12,20 +15,20 @@ export interface PwaSession {
 }
 
 export function saveSession(s: PwaSession) {
-  localStorage.setItem(JWT_KEY, s.token)
-  localStorage.setItem(TID_KEY, String(s.telegramId))
-  if (s.username) localStorage.setItem(NAME_KEY, s.username)
+  writeStored(JWT_KEY, s.token)
+  writeStored(TID_KEY, String(s.telegramId))
+  if (s.username) writeStored(NAME_KEY, s.username)
 }
 
 export function getSession(): PwaSession | null {
-  const token = localStorage.getItem(JWT_KEY)
-  const tid = Number(localStorage.getItem(TID_KEY))
+  const token = readStored(JWT_KEY)
+  const tid = Number(readStored(TID_KEY))
   if (!token || !tid) return null
-  return { token, telegramId: tid, username: localStorage.getItem(NAME_KEY) }
+  return { token, telegramId: tid, username: readStored(NAME_KEY) }
 }
 
 export function clearSession() {
-  localStorage.removeItem(JWT_KEY)
-  localStorage.removeItem(TID_KEY)
-  localStorage.removeItem(NAME_KEY)
+  removeStored(JWT_KEY)
+  removeStored(TID_KEY)
+  removeStored(NAME_KEY)
 }

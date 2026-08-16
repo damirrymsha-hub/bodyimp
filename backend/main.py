@@ -48,6 +48,7 @@ app = FastAPI(
 PUBLIC_API_PATHS = {
     "/api/bot/webhook",
     "/api/auth/telegram-login",
+    "/api/auth/telegram-initdata",
     "/api/auth/bot-info",
 }
 
@@ -76,11 +77,14 @@ async def auth_middleware(request: Request, call_next):
     init_data = request.headers.get("X-Telegram-Init-Data", "")
     if init_data:
         tid, reason = init_data_telegram_id_verbose(init_data)
-    else:
+
+    # JWT — запасной путь: клиент шлёт оба заголовка, и если initData протух
+    # или потерялся (перезагрузка WebView на iOS), сессия всё равно живёт.
+    if tid is None:
         authz = request.headers.get("Authorization", "")
         if authz.startswith("Bearer "):
             tid = jwt_telegram_id(authz[7:])
-            reason = "ok" if tid else "bad_jwt"
+            reason = "ok" if tid else (reason if init_data else "bad_jwt")
 
     if tid is None and IS_DEV:
         # Локальная разработка и тесты — без подписи, с явным дев-идентификатором.

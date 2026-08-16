@@ -12,7 +12,12 @@ from typing import Optional
 
 from database import get_db
 import models
-from services.telegram_auth import BOT_TOKEN, issue_jwt, verify_login_widget
+from services.telegram_auth import (
+    BOT_TOKEN,
+    init_data_telegram_id_verbose,
+    issue_jwt,
+    verify_login_widget,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +46,39 @@ def telegram_login(payload: LoginWidgetData, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.telegram_id == tid).first()
     if user is None:
         user = models.User(telegram_id=tid, username=payload.username)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    return {
+        "token": issue_jwt(tid),
+        "telegram_id": tid,
+        "username": user.username,
+        "needs_onboarding": user.daily_calories is None,
+    }
+
+
+class InitDataExchange(BaseModel):
+    init_data: str
+
+
+@router.post("/telegram-initdata")
+def telegram_initdata(payload: InitDataExchange, db: Session = Depends(get_db)):
+    """
+    Меняет подписанный initData мини-приложения на JWT-сессию.
+
+    Зачем: Telegram отдаёт initData один раз в адресной строке, и клиент легко
+    её теряет (переход по маршруту, перезагрузка WebView на iOS). Полученный
+    здесь токен живёт 30 дней и не зависит от адресной строки.
+    """
+    tid, reason = init_data_telegram_id_verbose(payload.init_data)
+    if tid is None:
+        logger.warning("initdata exchange rejected: %s", reason)
+        raise HTTPException(401, f"Подпись Telegram не подтверждена ({reason})")
+
+    user = db.query(models.User).filter(models.User.telegram_id == tid).first()
+    if user is None:
+        user = models.User(telegram_id=tid)
         db.add(user)
         db.commit()
         db.refresh(user)

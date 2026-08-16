@@ -2,18 +2,19 @@
 // и досылаются на бэкенд при следующей успешной загрузке.
 import type { FoodAddPayload } from '../api/client'
 import { addFood } from '../api/client'
+import { readStored, writeStored } from './storage'
 
 const QUEUE_KEY = 'bodyimp_offline_food_queue'
 
 export function enqueueFood(payload: FoodAddPayload) {
   const queue = readQueue()
   queue.push(payload)
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(queue))
+  writeStored(QUEUE_KEY, JSON.stringify(queue))
 }
 
 function readQueue(): FoodAddPayload[] {
   try {
-    const raw = localStorage.getItem(QUEUE_KEY)
+    const raw = readStored(QUEUE_KEY)
     return raw ? (JSON.parse(raw) as FoodAddPayload[]) : []
   } catch {
     return []
@@ -35,6 +36,6 @@ export async function flushQueue(): Promise<number> {
       remaining.push(item) // оставляем для следующей попытки
     }
   }
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(remaining))
+  writeStored(QUEUE_KEY, JSON.stringify(remaining))
   return sent
 }

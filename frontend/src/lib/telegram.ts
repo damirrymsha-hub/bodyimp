@@ -1,6 +1,12 @@
 // Обёртка над Telegram WebApp SDK.
 // Безопасно работает и вне Telegram (в обычном браузере при разработке).
 import WebApp from '@twa-dev/sdk'
+import {
+  getCapturedInitData,
+  getInitDataSource,
+  rememberInitData,
+  type InitDataSource,
+} from './initData'
 
 export function initTelegram() {
   try {
@@ -13,20 +19,33 @@ export function initTelegram() {
 
 // Открыто ли приложение внутри Telegram (есть подписанный initData).
 export function isInTelegram(): boolean {
-  try {
-    return Boolean(WebApp.initData)
-  } catch {
-    return false
-  }
+  return getInitData() !== ''
 }
 
 // Подписанная строка initData — уходит на бэкенд в каждом запросе Mini App.
+// Источников два: SDK (пока жив hash) и наш перехват (переживает перезагрузку).
 export function getInitData(): string {
+  let fromSdk = ''
   try {
-    return WebApp.initData ?? ''
+    fromSdk = WebApp.initData ?? ''
   } catch {
-    return ''
+    fromSdk = ''
   }
+  if (fromSdk) {
+    rememberInitData(fromSdk)
+    return fromSdk
+  }
+  return getCapturedInitData()
+}
+
+// Откуда получена подпись — показываем на экране диагностики.
+export function initDataSource(): InitDataSource {
+  try {
+    if (WebApp.initData) return 'sdk'
+  } catch {
+    /* вне Telegram */
+  }
+  return getInitDataSource()
 }
 
 // Возвращает telegram_id текущего пользователя (только внутри Telegram).

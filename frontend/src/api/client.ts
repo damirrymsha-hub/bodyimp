@@ -27,33 +27,69 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 export const api = axios.create({
   baseURL: API_URL,
   headers: { 'Content-Type': 'application/json' },
+  // Без таймаута зависший запрос ждёт вечно, и приложение выглядит «мёртвым».
+  // Бэкенд на бесплатном тарифе может просыпаться до ~30 секунд.
+  timeout: 45000,
 })
 
-// Аутентификация каждого запроса:
-// - внутри Telegram — подписанный initData (бэкенд проверяет HMAC);
-// - в браузере (PWA) — JWT, выданный после входа через Login Widget.
+// Последняя ошибка запроса — показывается на экране диагностики.
+export interface LastApiError {
+  url?: string
+  status: number | null
+  reason?: string
+  code?: string
+  message: string
+  at: string
+}
+
+let lastApiError: LastApiError | null = null
+
+export function getLastApiError(): LastApiError | null {
+  return lastApiError
+}
+
+// Аутентификация каждого запроса. Шлём ОБА заголовка, когда они есть:
+// сервер сначала проверяет подпись Telegram, а если она потерялась или
+// устарела — принимает JWT. Так сессия переживает перезагрузку WebView.
+//
+// Тело перехватчика обёрнуто в try: исключение здесь (например запрещённый
+// доступ к хранилищу в WebView) отменило бы запрос ещё до отправки, и это
+// выглядело бы как отсутствие интернета.
 api.interceptors.request.use((config) => {
-  const initData = getInitData()
-  if (initData) {
-    config.headers['X-Telegram-Init-Data'] = initData
-  } else {
+  try {
+    const initData = getInitData()
+    if (initData) config.headers['X-Telegram-Init-Data'] = initData
     const session = getSession()
     if (session) config.headers['Authorization'] = `Bearer ${session.token}`
+  } catch {
+    /* запрос уйдёт без авторизации — сервер ответит понятной 401 */
   }
   return config
 })
 
-// Протухший/битый JWT в PWA → сбрасываем сессию и уводим на экран входа.
 api.interceptors.response.use(
   (r) => r,
   (error) => {
-    if (
-      error?.response?.status === 401 &&
-      !getInitData() &&
-      getSession() !== null
-    ) {
-      clearSession()
-      window.location.reload()
+    try {
+      lastApiError = {
+        url: error?.config?.url,
+        status: error?.response?.status ?? null,
+        reason: error?.response?.data?.reason,
+        code: error?.code,
+        message: String(error?.message ?? 'unknown'),
+        at: new Date().toISOString(),
+      }
+      // Протухший JWT в браузере (без подписи Telegram) → назад на экран входа.
+      if (
+        error?.response?.status === 401 &&
+        !getInitData() &&
+        getSession() !== null
+      ) {
+        clearSession()
+        window.location.reload()
+      }
+    } catch {
+      /* диагностика не должна ломать обработку ошибки */
     }
     return Promise.reject(error)
   },
@@ -85,6 +121,16 @@ export async function telegramLogin(
     '/api/auth/telegram-login',
     widgetUser,
   )
+  return data
+}
+
+// Меняет подпись мини-приложения на JWT-сессию (живёт 30 дней).
+// Нужно потому, что подпись Telegram отдаёт один раз в адресной строке,
+// и клиент легко её теряет при перезагрузке WebView.
+export async function exchangeInitData(initData: string): Promise<LoginResponse> {
+  const { data } = await api.post<LoginResponse>('/api/auth/telegram-initdata', {
+    init_data: initData,
+  })
   return data
 }
 
