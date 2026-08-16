@@ -55,6 +55,17 @@ describe('перехват подписи Telegram', () => {
     expect(m.getCapturedInitData()).toContain('signature=')
   })
 
+  it('узнаёт пользователя из сохранённой подписи', async () => {
+    window.location.hash = hashFor(RAW_INIT_DATA)
+    const m = await loadModule()
+    expect(m.initDataUser()).toEqual({ id: 279058397, username: null })
+  })
+
+  it('не выдумывает пользователя, когда подписи нет', async () => {
+    const m = await loadModule()
+    expect(m.initDataUser()).toBeNull()
+  })
+
   it('переживает полностью заблокированное хранилище', async () => {
     const boom = () => {
       throw new DOMException('denied', 'SecurityError')

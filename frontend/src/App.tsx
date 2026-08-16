@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useUserStore } from './store/userStore'
 import { getInitData, getTelegramUser } from './lib/telegram'
+import { initDataUser } from './lib/initData'
 import { getSession, saveSession } from './lib/auth'
 import { exchangeInitData } from './api/client'
 import Home from './pages/Home'
@@ -17,11 +18,14 @@ interface Identity {
   username: string | null
 }
 
-// Кто пользователь: внутри Telegram — из подписи (в dev — заглушка),
-// в браузере — из сохранённой сессии. null → экран входа.
+// Кто пользователь. Три источника по убыванию свежести:
+// SDK Telegram → сохранённая подпись (WebView мог перезагрузиться и потерять
+// адресную строку) → сессия PWA. null → экран входа.
 function resolveIdentity(): Identity | null {
   const tg = getTelegramUser()
   if (tg) return tg
+  const fromCaptured = initDataUser()
+  if (fromCaptured) return fromCaptured
   const session = getSession()
   if (session) return { id: session.telegramId, username: session.username }
   return null

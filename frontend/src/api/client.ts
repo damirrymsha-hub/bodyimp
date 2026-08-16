@@ -74,7 +74,7 @@ api.interceptors.response.use(
       lastApiError = {
         url: error?.config?.url,
         status: error?.response?.status ?? null,
-        reason: error?.response?.data?.reason,
+        reason: error?.response?.data?.reason ?? error?.response?.data?.detail,
         code: error?.code,
         message: String(error?.message ?? 'unknown'),
         at: new Date().toISOString(),

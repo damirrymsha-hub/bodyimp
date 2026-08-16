@@ -15,6 +15,15 @@ export function initTelegram() {
   } catch {
     // Вне Telegram SDK может бросать — игнорируем для локальной разработки.
   }
+  try {
+    // На iOS вертикальный свайп внутри приложения закрывает окно Telegram —
+    // при прокрутке дневника это происходит постоянно. Метод появился в
+    // Bot API 7.7, поэтому вызываем через проверку.
+    const api = WebApp as unknown as { disableVerticalSwipes?: () => void }
+    api.disableVerticalSwipes?.()
+  } catch {
+    /* старый клиент — просто живём без этого */
+  }
 }
 
 // Открыто ли приложение внутри Telegram (есть подписанный initData).

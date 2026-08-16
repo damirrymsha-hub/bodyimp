@@ -60,3 +60,24 @@ export function rememberInitData(value: string) {
 export function clearCapturedInitData() {
   removeStored(STORAGE_KEY)
 }
+
+/**
+ * Пользователь из сохранённой подписи.
+ * Нужен, когда SDK уже потерял данные (WebView перезагрузился и hash пуст),
+ * а подпись у нас сохранена: приложение должно узнать человека, а не
+ * показывать ему экран входа внутри Telegram.
+ * Подпись здесь только читается — подлинность всё равно проверяет сервер.
+ */
+export function initDataUser(): { id: number; username: string | null } | null {
+  const raw = getCapturedInitData()
+  if (!raw) return null
+  try {
+    const userJson = new URLSearchParams(raw).get('user')
+    if (!userJson) return null
+    const user = JSON.parse(userJson)
+    if (typeof user?.id !== 'number') return null
+    return { id: user.id, username: user.username ?? null }
+  } catch {
+    return null
+  }
+}
