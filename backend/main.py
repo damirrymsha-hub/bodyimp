@@ -144,8 +144,27 @@ def root():
     """
     Проверка работоспособности API. HEAD нужен мониторам аптайма
     (UptimeRobot по умолчанию шлёт HEAD; без него монитор видит 405=Down).
+
+    Заодно сообщает тип колонки telegram_id: она обязана быть 64-битной,
+    иначе регистрация аккаунтов с современными идентификаторами Telegram
+    падает. Так применение миграции можно подтвердить, а не предполагать.
     """
-    return {"app": APP_NAME, "status": "ok"}
+    return {"app": APP_NAME, "status": "ok", "telegram_id_type": _telegram_id_type()}
+
+
+def _telegram_id_type() -> str:
+    """Фактический тип колонки telegram_id в работающей базе."""
+    try:
+        from sqlalchemy import inspect as sa_inspect
+
+        from database import engine
+
+        for column in sa_inspect(engine).get_columns("users"):
+            if column["name"] == "telegram_id":
+                return str(column["type"]).lower()
+        return "нет колонки"
+    except Exception as e:  # noqa: BLE001
+        return f"недоступно: {type(e).__name__}"
 
 
 @app.get("/api/test/openrouter")
