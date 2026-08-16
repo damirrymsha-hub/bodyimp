@@ -1,5 +1,6 @@
 // Экран диагностики: показывает, что именно мешает приложению работать.
 // Нужен, чтобы не гадать по описанию «не работает» — достаточно скриншота.
+import { useEffect, useState } from 'react'
 import { getLastApiError } from '../api/client'
 import { getSession } from '../lib/auth'
 import { storageAvailable } from '../lib/storage'
@@ -16,7 +17,52 @@ function Row({ label, value }: { label: string; value: string }) {
   )
 }
 
+const BACKEND = 'https://bodyimp.onrender.com'
+
+// Активные проверки связи. Их задача — отделить недоступность хоста
+// (провайдер, DNS, блокировка) от отказа CORS: браузер сообщает и о том,
+// и о другом одинаково — «сетевая ошибка».
+async function probe(url: string, noCors: boolean): Promise<string> {
+  const started = performance.now()
+  try {
+    await fetch(url, {
+      cache: 'no-store',
+      mode: noCors ? 'no-cors' : 'cors',
+    })
+    return `прошла (${Math.round(performance.now() - started)} мс)`
+  } catch (e) {
+    return `НЕ ПРОШЛА: ${(e as Error).message}`
+  }
+}
+
+function useConnectivity() {
+  const [checks, setChecks] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    let cancelled = false
+    const set = (k: string, v: string) =>
+      !cancelled && setChecks((c) => ({ ...c, [k]: v }))
+
+    set('Интернет вообще', '…')
+    set('Бэкенд доступен', '…')
+    set('Бэкенд отвечает с CORS', '…')
+    set('API через свой домен', '…')
+
+    probe('https://api.telegram.org/', true).then((r) => set('Интернет вообще', r))
+    probe(`${BACKEND}/`, true).then((r) => set('Бэкенд доступен', r))
+    probe(`${BACKEND}/`, false).then((r) => set('Бэкенд отвечает с CORS', r))
+    probe('/api/auth/bot-info', false).then((r) => set('API через свой домен', r))
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return checks
+}
+
 export default function Diagnostics({ onClose }: { onClose: () => void }) {
+  const connectivity = useConnectivity()
   const initData = getInitData()
   const session = getSession()
   const err = getLastApiError()
@@ -56,7 +102,13 @@ export default function Diagnostics({ onClose }: { onClose: () => void }) {
       <Row label="Сессия (JWT)" value={session ? 'есть' : 'нет'} />
       <Row label="Хранилище" value={storageAvailable() ? 'работает' : 'ЗАБЛОКИРОВАНО'} />
       <Row label="Адрес сервера" value={API_URL} />
+      <Row label="Домен приложения" value={location.origin} />
       <Row label="Онлайн (по мнению ОС)" value={navigator.onLine ? 'да' : 'нет'} />
+
+      <h2 className="mb-2 mt-6 text-sm font-bold text-ink">Проверка связи</h2>
+      {Object.entries(connectivity).map(([label, value]) => (
+        <Row key={label} label={label} value={value} />
+      ))}
 
       <h2 className="mb-2 mt-6 text-sm font-bold text-ink">Последняя ошибка запроса</h2>
       {err ? (
