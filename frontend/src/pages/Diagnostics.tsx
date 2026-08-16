@@ -1,12 +1,10 @@
 // Экран диагностики: показывает, что именно мешает приложению работать.
 // Нужен, чтобы не гадать по описанию «не работает» — достаточно скриншота.
 import { useEffect, useState } from 'react'
-import { getLastApiError } from '../api/client'
+import { api, getLastApiError } from '../api/client'
 import { getSession } from '../lib/auth'
 import { storageAvailable } from '../lib/storage'
 import { getInitData, getTelegramPlatform, initDataSource, WebApp } from '../lib/telegram'
-
-const API_URL = import.meta.env.VITE_API_URL || '(не задан)'
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -101,7 +99,10 @@ export default function Diagnostics({ onClose }: { onClose: () => void }) {
       <Row label="Длина подписи" value={String(initData.length)} />
       <Row label="Сессия (JWT)" value={session ? 'есть' : 'нет'} />
       <Row label="Хранилище" value={storageAvailable() ? 'работает' : 'ЗАБЛОКИРОВАНО'} />
-      <Row label="Адрес сервера" value={API_URL} />
+      <Row
+        label="Путь до API"
+        value={api.defaults.baseURL ? api.defaults.baseURL : 'свой домен (прокси)'}
+      />
       <Row label="Домен приложения" value={location.origin} />
       <Row label="Онлайн (по мнению ОС)" value={navigator.onLine ? 'да' : 'нет'} />
 
