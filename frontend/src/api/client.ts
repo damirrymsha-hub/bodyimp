@@ -22,7 +22,16 @@ import type {
 import { getInitData } from '../lib/telegram'
 import { clearSession, getSession } from '../lib/auth'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+// Прямой адрес бэкенда.
+export const DIRECT_BASE = 'https://bodyimp.onrender.com'
+// Свой домен: vercel.json проксирует /api/* на бэкенд. Тогда запрос никуда
+// не «уходит» с точки зрения браузера — нет ни CORS, ни предварительных
+// запросов, и недоступность хоста бэкенда у провайдера уже не мешает.
+export const PROXY_BASE = ''
+
+const API_URL = import.meta.env.DEV
+  ? import.meta.env.VITE_API_URL || 'http://localhost:8000'
+  : PROXY_BASE
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -70,6 +79,24 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (r) => r,
   (error) => {
+    // Один из двух путей до бэкенда может не работать в конкретной сети.
+    // Если запрос не дошёл вообще — пробуем второй и запоминаем рабочий.
+    const cfg = error?.config as
+      | (typeof error.config & { _triedOtherBase?: boolean })
+      | undefined
+    const current = cfg?.baseURL ?? PROXY_BASE
+    // Переключаемся только между двумя боевыми путями: в разработке адрес
+    // другой (localhost), и ломиться оттуда в прод не нужно.
+    const switchable = current === PROXY_BASE || current === DIRECT_BASE
+    if (cfg && switchable && !cfg._triedOtherBase && error?.code === 'ERR_NETWORK') {
+      cfg._triedOtherBase = true
+      cfg.baseURL = current === DIRECT_BASE ? PROXY_BASE : DIRECT_BASE
+      return api.request(cfg).then((res) => {
+        api.defaults.baseURL = cfg.baseURL // дальше ходим рабочим путём
+        return res
+      })
+    }
+
     try {
       lastApiError = {
         url: error?.config?.url,
