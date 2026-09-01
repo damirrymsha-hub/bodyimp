@@ -26,10 +26,17 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 # Пример платной конфигурации:
 #   AI_MODELS=google/gemini-3.1-flash-lite,google/gemma-4-31b-it:free
 # Без переменной — бесплатный набор по умолчанию (проверен по /api/v1/models).
+# Порядок = приоритет; проверено каталогом /api/v1/models и живыми запросами.
+# Замеры: minimax отвечает ~3 с чистым JSON; nemotron-3-nano-omni работает, но
+# это reasoning-модель — ~35 с и 1400 токенов на разбор, поэтому она последняя.
+# Обе Gemma сейчас отдают 429 (провайдер режет бесплатный поток), но остаются
+# в списке: список перебирается по порядку, и они подхватятся при восстановлении.
+# Модель nvidia/nemotron-nano-12b-v2-vl исчезла из каталога — удалена (давала 404).
 _DEFAULT_MODELS = [
-    "google/gemma-4-31b-it:free",         # Google Gemma vision, хорошо отдаёт JSON
-    "google/gemma-4-26b-a4b-it:free",     # запасной Gemma vision
-    "nvidia/nemotron-nano-12b-v2-vl:free",  # последний вариант (vision-language)
+    "minimax/minimax-m3:free",            # основная: быстрая, стабильный JSON
+    "google/gemma-4-31b-it:free",         # резерв
+    "google/gemma-4-26b-a4b-it:free",     # резерв
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",  # крайний случай: медленная
 ]
 _env_models = [m.strip() for m in os.getenv("AI_MODELS", "").split(",") if m.strip()]
 VISION_MODELS = _env_models or _DEFAULT_MODELS

@@ -149,7 +149,16 @@ def root():
     иначе регистрация аккаунтов с современными идентификаторами Telegram
     падает. Так применение миграции можно подтвердить, а не предполагать.
     """
-    return {"app": APP_NAME, "status": "ok", "telegram_id_type": _telegram_id_type()}
+    from services.openrouter_service import VISION_MODELS
+
+    return {
+        "app": APP_NAME,
+        "status": "ok",
+        "telegram_id_type": _telegram_id_type(),
+        # Список моделей ИИ: бесплатные модели исчезают из каталога и упираются
+        # в лимиты, поэтому важно видеть, что именно работает в проде сейчас.
+        "ai_models": VISION_MODELS,
+    }
 
 
 def _telegram_id_type() -> str:
