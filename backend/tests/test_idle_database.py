@@ -19,6 +19,12 @@ import main
 
 
 class IdleTests(unittest.TestCase):
+    def test_postgres_driver_is_explicit(self):
+        for scheme in ('postgres://', 'postgresql://'):
+            self.assertEqual(database.normalize_database_url(scheme + 'host/db'), 'postgresql+psycopg2://host/db')
+        self.assertEqual(database.normalize_database_url('sqlite://'), 'sqlite://')
+        self.assertEqual(database.normalize_database_url('postgresql+psycopg://host/db'), 'postgresql+psycopg://host/db')
+
     def test_get_and_head_never_touch_database(self):
         with patch.object(database.engine, 'connect', side_effect=AssertionError('DB touched')), \
              patch('sqlalchemy.inspect', side_effect=AssertionError('Schema inspected')):

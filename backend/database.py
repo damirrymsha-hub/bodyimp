@@ -13,12 +13,16 @@ from sqlalchemy.exc import OperationalError
 
 load_dotenv()
 
-# Строка подключения. По умолчанию — локальный файл SQLite.
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./bodyimp.db")
+def normalize_database_url(url: str) -> str:
+    # Явно выбираем установленный psycopg2: драйвер по умолчанию зависит
+    # от версии SQLAlchemy. Явные настройки другого драйвера сохраняем.
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg2://" + url[len(prefix):]
+    return url
 
-# Neon/Heroku выдают URL вида postgres://, а SQLAlchemy 2.x требует postgresql://
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+DATABASE_URL = normalize_database_url(os.getenv("DATABASE_URL", "sqlite:///./bodyimp.db"))
 
 # Для SQLite нужно отключить проверку потока (FastAPI работает в нескольких потоках).
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
