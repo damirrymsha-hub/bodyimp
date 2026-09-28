@@ -36,8 +36,7 @@ export default function Onboarding() {
   const [weight, setWeight] = useState('')
   const [activity, setActivity] = useState<ActivityLevel | null>(null)
   const [goal, setGoal] = useState<Goal | null>(null)
-  // Помощники (шаг 4): напоминания ботом и адаптивная норма. По умолчанию вкл.
-  const [notify, setNotify] = useState(true)
+  // Адаптивная норма (шаг 4).
   const [adaptive, setAdaptive] = useState(true)
   const [result, setResult] = useState<User | null>(null)
   const [saving, setSaving] = useState(false)
@@ -72,7 +71,6 @@ export default function Onboarding() {
       weight_kg: Number(weight),
       activity_level: activity!,
       goal: goal!,
-      notifications_enabled: notify,
       adaptive_tdee: adaptive,
     }
     try {
@@ -189,16 +187,10 @@ export default function Onboarding() {
             </Step>
           )}
 
-          {/* Шаг 4 — помощники: напоминания и адаптивная норма */}
+          {/* Шаг 4 — адаптивная норма */}
           {step === 4 && (
             <Step title="Помощники">
               <div className="flex flex-col gap-2">
-                <ListCard
-                  active={notify}
-                  onClick={() => setNotify((v) => !v)}
-                  title="Напоминания от бота"
-                  desc="Вода днём и вечерняя сводка — прямо в чат Telegram"
-                />
                 <ListCard
                   active={adaptive}
                   onClick={() => setAdaptive((v) => !v)}
@@ -207,7 +199,7 @@ export default function Onboarding() {
                 />
               </div>
               <p className="mt-4 text-xs text-muted">
-                Обе настройки можно поменять в профиле в любой момент.
+                Эту настройку можно поменять в профиле в любой момент.
               </p>
             </Step>
           )}

@@ -26,7 +26,6 @@ export interface User {
   daily_fat_g: number | null
   daily_carbs_g: number | null
   daily_water_ml: number | null
-  notifications_enabled?: boolean
   adaptive_tdee?: boolean
   tdee_adjustment?: number
   created_at: string

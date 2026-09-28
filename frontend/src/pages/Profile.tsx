@@ -211,26 +211,12 @@ export default function Profile() {
         <Flame size={16} /> {saving ? 'Сохранение…' : 'Сохранить изменения'}
       </button>
 
-      {/* Помощники: напоминания и адаптивная норма */}
+      {/* Адаптивная норма */}
       <section className="mt-6">
         <h2 className="mb-2 px-1 text-xs font-semibold uppercase text-muted">
           Помощники
         </h2>
         <div className="flex flex-col gap-2">
-          <ToggleRow
-            title="Напоминания от бота"
-            desc="Вода днём и вечерняя сводка в чат"
-            value={!!user.notifications_enabled}
-            onChange={async (v) => {
-              if (!telegramId) return
-              haptic('light')
-              try {
-                setUser(await updateUser(telegramId, { notifications_enabled: v }))
-              } catch {
-                showToast('Не удалось сохранить', 'error')
-              }
-            }}
-          />
           <ToggleRow
             title="Умная норма калорий"
             desc="Еженедельная коррекция по динамике веса"

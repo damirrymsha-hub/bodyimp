@@ -19,7 +19,6 @@ class UserRegister(BaseModel):
     weight_kg: Optional[float] = None
     goal: Optional[str] = None
     activity_level: Optional[str] = None
-    notifications_enabled: Optional[bool] = None
     adaptive_tdee: Optional[bool] = None
 
 
@@ -31,7 +30,6 @@ class UserUpdate(BaseModel):
     weight_kg: Optional[float] = None
     goal: Optional[str] = None
     activity_level: Optional[str] = None
-    notifications_enabled: Optional[bool] = None
     adaptive_tdee: Optional[bool] = None
 
 
@@ -50,7 +48,6 @@ class UserOut(BaseModel):
     daily_fat_g: Optional[int]
     daily_carbs_g: Optional[int]
     daily_water_ml: Optional[int] = 2000
-    notifications_enabled: Optional[bool] = False
     adaptive_tdee: Optional[bool] = False
     tdee_adjustment: Optional[int] = 0
     created_at: datetime

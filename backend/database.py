@@ -3,10 +3,13 @@
 Здесь создаётся движок, фабрика сессий и базовый класс моделей.
 """
 import os
+import threading
+import time
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.exc import OperationalError
 
 load_dotenv()
 
@@ -27,10 +30,33 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Базовый класс для всех ORM-моделей.
 Base = declarative_base()
+_initialized = False
+_init_lock = threading.Lock()
+_retry_initialization_at = 0.0
+
+
+def ensure_initialized():
+    """После сбоя старта пробуем снова только при реальном запросе к БД."""
+    global _initialized, _retry_initialization_at
+    if _initialized:
+        return
+    with _init_lock:
+        if _initialized:
+            return
+        if time.monotonic() < _retry_initialization_at:
+            from fastapi import HTTPException
+            raise HTTPException(503, "База данных временно недоступна.")
+        try:
+            init_db()
+        except OperationalError:
+            _retry_initialization_at = time.monotonic() + 900
+            raise
+        _initialized = True
 
 
 def get_db():
     """Зависимость FastAPI: выдаёт сессию БД и гарантированно закрывает её."""
+    ensure_initialized()
     db = SessionLocal()
     try:
         yield db

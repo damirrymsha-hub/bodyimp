@@ -177,7 +177,6 @@ export interface RegisterPayload {
   weight_kg?: number
   goal?: Goal
   activity_level?: ActivityLevel
-  notifications_enabled?: boolean
   adaptive_tdee?: boolean
 }
 
