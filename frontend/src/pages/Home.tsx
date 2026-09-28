@@ -1,9 +1,7 @@
-// Главный экран — дневник дня: питание одной карточкой (кольцо + макросы рядом),
-// вода и активность сеткой, еда сгруппирована по приёмам пищи с суммами.
-import { useEffect, useMemo, useState } from 'react'
+// Питание: дневник дня и прямой вход в фото/текст.
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AnimatePresence } from 'framer-motion'
-import { Plus } from 'lucide-react'
+import { Plus, Camera, PencilLine } from 'lucide-react'
 import { useUserStore } from '../store/userStore'
 import { useUIStore } from '../store/uiStore'
 import { getStreak, getWeeklyStats } from '../api/client'
@@ -11,12 +9,10 @@ import { haptic } from '../lib/telegram'
 import { dayParts } from '../lib/date'
 import CalendarStrip from '../components/CalendarStrip'
 import NutritionRing from '../components/NutritionRing'
-import WaterCard from '../components/WaterCard'
-import ActivityCard, { ActivityRows } from '../components/ActivityCard'
 import FoodItem from '../components/FoodItem'
 import TabBar from '../components/TabBar'
-import AddFood from './AddFood'
-import YesterdayModal from '../components/YesterdayModal'
+import LazyBoundary from '../components/LazyBoundary'
+const AddFood = lazy(() => import('./AddFood'))
 import type { FoodEntry, MealType } from '../types'
 
 // Порядок секций дневника и подписи.
@@ -29,11 +25,10 @@ const MEALS: { key: MealType; label: string; add: string }[] = [
 
 export default function Home() {
   const navigate = useNavigate()
-  const { user, foods, totals, netCalories, burnedTotal, loadDay } = useUserStore()
+  const { user, foods, totals, netCalories, burnedTotal, loadDay, error } = useUserStore()
   const { selectedDate } = useUIStore()
   // adding: null — закрыто; {} — общий вход с FAB; {meal} — из секции.
-  const [adding, setAdding] = useState<{ meal?: MealType } | null>(null)
-  const [showYesterday, setShowYesterday] = useState(false)
+  const [adding, setAdding] = useState<{ meal?: MealType; mode?: 'menu' | 'photo' | 'text' } | null>(null)
   const [editing, setEditing] = useState<FoodEntry | null>(null)
   const [streak, setStreak] = useState(0)
   const [avgKcal, setAvgKcal] = useState<number | null>(null)
@@ -90,7 +85,7 @@ export default function Home() {
             )}
             <button
               onClick={() => navigate('/profile')}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-ink text-sm font-bold text-white"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-ink text-sm font-bold text-white"
               aria-label="Профиль"
             >
               {initial}
@@ -99,6 +94,7 @@ export default function Home() {
         </header>
 
         <CalendarStrip />
+        {error && <div role="alert" className="rounded-2xl bg-card p-3 text-sm">{error}<button onClick={() => void loadDay(selectedDate)} className="ml-2 min-h-[44px] underline">Повторить</button></div>}
 
         {/* Питание: кольцо и макросы рядом + формула дня */}
         <section className="rounded-[2rem] bg-card p-4 shadow-card">
@@ -133,13 +129,10 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Вода + Активность */}
-        <section className="grid grid-cols-2 gap-3">
-          <WaterCard />
-          <ActivityCard />
+        <section className="grid grid-cols-2 gap-3" aria-label="Добавить еду">
+          <button onClick={() => { haptic('light'); setAdding({ mode: 'photo' }) }} className="flex min-h-[76px] items-center justify-center gap-3 rounded-3xl bg-ink text-base font-bold text-white"><Camera size={22} />Фото</button>
+          <button onClick={() => { haptic('light'); setAdding({ mode: 'text' }) }} className="flex min-h-[76px] items-center justify-center gap-3 rounded-3xl bg-card text-base font-bold shadow-card"><PencilLine size={22} />Текст</button>
         </section>
-
-        <ActivityRows />
 
         {/* Дневник по приёмам пищи */}
         <section className="flex flex-col gap-4">
@@ -150,11 +143,11 @@ export default function Home() {
             <button
               onClick={() => {
                 haptic('light')
-                setShowYesterday(true)
+                setAdding({ mode: 'menu' })
               }}
-              className="rounded-full bg-ink/5 px-3 py-2 text-xs font-semibold text-muted"
+              className="min-h-[44px] rounded-full bg-ink/5 px-3 py-2 text-xs font-semibold text-muted"
             >
-              Повторить вчера
+              Ещё
             </button>
           </div>
 
@@ -206,47 +199,21 @@ export default function Home() {
           })}
         </section>
 
-        {/* Сводка недели вместо чёрной кнопки на полотне */}
-        <button
-          onClick={() => navigate('/progress')}
-          className="flex items-center gap-2 rounded-3xl bg-card p-4 text-left shadow-card"
-        >
-          <span className="flex-1 text-xs">
-            <span className="font-bold">Стрик {streak} дн.</span>
-            {avgKcal != null && (
-              <span className="text-muted"> · средне {avgKcal} ккал</span>
-            )}
-          </span>
-          <span className="text-muted">›</span>
-        </button>
+        <p className="px-1 text-center text-xs text-muted">🔥 {streak} дн. подряд{avgKcal != null && <> · среднее {avgKcal} ккал</>}</p>
       </div>
-
-      {/* FAB над таббаром */}
-      <button
-        onClick={() => {
-          haptic('medium')
-          setAdding({})
-        }}
-        className="fixed bottom-[76px] left-1/2 z-30 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full bg-ink text-white shadow-[0_8px_20px_rgba(0,0,0,0.18)]"
-        aria-label="Добавить еду"
-      >
-        <Plus size={28} />
-      </button>
 
       <TabBar />
 
       {/* key обязателен: без него React переиспользует смонтированный AddFood
           и сохраняет прежний выбранный приём пищи при повторном открытии. */}
-      <AnimatePresence>
+      <LazyBoundary><Suspense fallback={<div role="status" className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl bg-card p-8 text-center">Открываем…</div>}>
         {adding && (
           <AddFood
-            key={`add-${adding.meal ?? 'any'}`}
+            key={`add-${adding.meal ?? 'any'}-${adding.mode ?? 'menu'}`}
             initialMeal={adding.meal}
+            initialMode={adding.mode}
             onClose={() => setAdding(null)}
           />
-        )}
-        {showYesterday && (
-          <YesterdayModal key="yesterday" onClose={() => setShowYesterday(false)} />
         )}
         {editing && (
           <AddFood
@@ -255,7 +222,7 @@ export default function Home() {
             onClose={() => setEditing(null)}
           />
         )}
-      </AnimatePresence>
+      </Suspense></LazyBoundary>
     </div>
   )
 }

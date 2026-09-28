@@ -1,17 +1,20 @@
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useUserStore } from './store/userStore'
 import { getInitData, getTelegramUser } from './lib/telegram'
 import { initDataUser } from './lib/initData'
 import { getSession, saveSession } from './lib/auth'
 import { exchangeInitData } from './api/client'
-import Home from './pages/Home'
-import Diagnostics from './pages/Diagnostics'
-import Login from './pages/Login'
-import Onboarding from './pages/Onboarding'
-import Profile from './pages/Profile'
-import Progress from './pages/Progress'
+import LazyBoundary from './components/LazyBoundary'
 import Toasts from './components/Toasts'
+
+const Home = lazy(() => import('./pages/Home'))
+const Activity = lazy(() => import('./pages/Activity'))
+const Diagnostics = lazy(() => import('./pages/Diagnostics'))
+const Login = lazy(() => import('./pages/Login'))
+const Onboarding = lazy(() => import('./pages/Onboarding'))
+const Profile = lazy(() => import('./pages/Profile'))
+const Progress = lazy(() => import('./pages/Progress'))
 
 interface Identity {
   id: number
@@ -32,10 +35,15 @@ function resolveIdentity(): Identity | null {
 }
 
 export default function App() {
+  return <LazyBoundary><Suspense fallback={<div role="status" className="p-8 text-center text-muted">Загрузка BodyImp…</div>}><AppContent /></Suspense></LazyBoundary>
+}
+
+function AppContent() {
   const { user, loading, error, init } = useUserStore()
   const [identity, setIdentity] = useState<Identity | null>(resolveIdentity)
   const [showDiag, setShowDiag] = useState(false)
   const [attempt, setAttempt] = useState(0)
+  const [initializedIdentity, setInitializedIdentity] = useState<number | null>(null)
 
   const handleLoggedIn = useCallback(
     (id: number, username: string | null) => setIdentity({ id, username }),
@@ -66,7 +74,14 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (identity) init(identity.id, identity.username)
+    let active = true
+    if (identity) {
+      // Не направляем в анкету до завершения первой загрузки профиля.
+      void init(identity.id, identity.username).finally(() => {
+        if (active) setInitializedIdentity(identity.id)
+      })
+    }
+    return () => { active = false }
   }, [identity, init, attempt])
 
   if (showDiag) return <Diagnostics onClose={() => setShowDiag(false)} />
@@ -75,7 +90,7 @@ export default function App() {
     return <Login onLoggedIn={handleLoggedIn} />
   }
 
-  if (loading && !user) {
+  if (initializedIdentity !== identity.id || (loading && !user)) {
     return (
       <div className="flex h-screen items-center justify-center bg-bg">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-ink/10 border-t-ink" />
@@ -120,6 +135,7 @@ export default function App() {
           }
         />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/activity" element={needsOnboarding ? <Navigate to="/onboarding" replace /> : <Activity />} />
         <Route path="/progress" element={<Progress />} />
         <Route path="/diagnostics" element={<Diagnostics onClose={() => history.back()} />} />
         <Route path="*" element={<Navigate to="/" replace />} />

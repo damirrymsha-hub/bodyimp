@@ -68,8 +68,8 @@ export default function Diagnostics({ onClose }: { onClose: () => void }) {
   let tgVersion = '—'
   let tgUser = '—'
   try {
-    tgVersion = WebApp.version ?? '—'
-    const u = WebApp.initDataUnsafe?.user
+    tgVersion = WebApp?.version ?? '—'
+    const u = WebApp?.initDataUnsafe?.user
     tgUser = u ? `${u.id}${u.username ? ` @${u.username}` : ''}` : 'нет'
   } catch {
     /* вне Telegram */

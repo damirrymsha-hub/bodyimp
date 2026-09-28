@@ -1,7 +1,7 @@
 // Модальное окно добавления/редактирования еды.
 // Режимы: вручную (с пересчётом порции/100 г) / фото / быстрый поиск.
 // Если передан editingEntry — окно открывается сразу в режиме правки.
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   X,
@@ -16,18 +16,20 @@ import {
   Plus,
 } from 'lucide-react'
 import { getRecentFoods } from '../api/client'
-import { z } from 'zod'
+import { validateManualFood } from '../lib/foodValidation'
 import { useUserStore } from '../store/userStore'
 import { useUIStore } from '../store/uiStore'
 import { haptic, hapticSuccess } from '../lib/telegram'
 import type { MealType, PhotoAnalysisResult, FoodEntry } from '../types'
-import ScanFood from './ScanFood'
-import SearchTab from '../components/SearchTab'
-import FavoritesTab from '../components/FavoritesTab'
-import DescribeFood from '../components/DescribeFood'
-import BarcodeTab from '../components/BarcodeTab'
+const ScanFood = lazy(() => import('./ScanFood'))
+const SearchTab = lazy(() => import('../components/SearchTab'))
+const FavoritesTab = lazy(() => import('../components/FavoritesTab'))
+const DescribeFood = lazy(() => import('../components/DescribeFood'))
+const BarcodeTab = lazy(() => import('../components/BarcodeTab'))
 
-type Mode = 'menu' | 'manual' | 'photo' | 'search' | 'favorites' | 'text' | 'barcode'
+const YesterdayModal = lazy(() => import('../components/YesterdayModal'))
+
+type Mode = 'menu' | 'manual' | 'photo' | 'search' | 'favorites' | 'text' | 'barcode' | 'yesterday'
 type UnitMode = 'portion' | 'per100'
 
 const MEALS: { value: MealType; label: string }[] = [
@@ -38,13 +40,6 @@ const MEALS: { value: MealType; label: string }[] = [
 ]
 
 // Схема валидации (проверяем уже пересчитанные итоговые значения).
-const manualSchema = z.object({
-  name: z.string().min(1, 'Введите название'),
-  calories: z.number().min(0).max(10000),
-  protein_g: z.number().min(0).max(1000),
-  fat_g: z.number().min(0).max(1000),
-  carbs_g: z.number().min(0).max(1000),
-})
 
 // Приём пищи по времени суток — разумный старт вместо вечного «Перекуса».
 function mealByTime(): MealType {
@@ -65,17 +60,16 @@ const MEAL_IN: Record<MealType, string> = {
 interface Props {
   onClose: () => void
   editingEntry?: FoodEntry // если задано — режим редактирования
+  initialMode?: 'menu' | 'photo' | 'text'
   initialMeal?: MealType   // задан при входе из секции дневника
 }
 
-export default function AddFood({ onClose, editingEntry, initialMeal }: Props) {
+export default function AddFood({ onClose, editingEntry, initialMeal, initialMode = 'menu' }: Props) {
   const isEditing = !!editingEntry
-  const [mode, setMode] = useState<Mode>(isEditing ? 'manual' : 'menu')
+  const [mode, setMode] = useState<Mode>(isEditing ? 'manual' : initialMode)
   const [meal, setMeal] = useState<MealType>(
     editingEntry?.meal_type ?? initialMeal ?? mealByTime(),
   )
-  // Аккордеон «Другие способы» — свёрнут, когда пришли из секции дневника.
-  const [modesOpen, setModesOpen] = useState(!initialMeal)
   const { user, addFood, updateFood, removeFood, addFavorite } = useUserStore()
   const { showToast } = useUIStore()
 
@@ -146,16 +140,17 @@ export default function AddFood({ onClose, editingEntry, initialMeal }: Props) {
   }
 
   async function handleManualSave() {
-    const parsed = manualSchema.safeParse({
+    const data = {
       name: name.trim(),
       ...computed,
-    })
-    if (!parsed.success) {
-      showToast(parsed.error.issues[0]?.message ?? 'Проверьте данные', 'error')
+    }
+    const validationError = validateManualFood(data, q)
+    if (validationError) {
+      showToast(validationError, 'error')
       return
     }
     const base = {
-      ...parsed.data,
+      ...data,
       base_per_100g: unitMode === 'per100',
       portion_size_g: unitMode === 'per100' ? q || null : null,
     }
@@ -167,7 +162,7 @@ export default function AddFood({ onClose, editingEntry, initialMeal }: Props) {
       // Опционально — сохранить продукт в избранное (базовые значения).
       if (saveFav) {
         await addFavorite({
-          name: parsed.data.name,
+          name: data.name,
           calories: Number(calories) || 0,
           protein_g: Number(protein) || 0,
           fat_g: Number(fat) || 0,
@@ -227,6 +222,8 @@ export default function AddFood({ onClose, editingEntry, initialMeal }: Props) {
     })
   }
 
+  if (mode === 'yesterday') return <Suspense fallback={<div role="status" className="fixed inset-0 z-40 flex items-center justify-center bg-bg">Загрузка блюд…</div>}><YesterdayModal onClose={onClose} /></Suspense>
+
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40">
       <motion.div
@@ -244,7 +241,7 @@ export default function AddFood({ onClose, editingEntry, initialMeal }: Props) {
               : mode === 'menu'
                 ? initialMeal
                   ? `Добавить в ${MEAL_IN[initialMeal]}`
-                  : 'Добавить еду'
+                  : 'Ещё'
                 : mode === 'manual'
                   ? 'Вручную'
                   : mode === 'photo'
@@ -259,7 +256,7 @@ export default function AddFood({ onClose, editingEntry, initialMeal }: Props) {
           </h2>
           <button
             onClick={() =>
-              isEditing || mode === 'menu' ? onClose() : setMode('menu')
+              onClose()
             }
             className="-mr-1 flex h-11 w-11 items-center justify-center rounded-full bg-ink/5"
             aria-label="Закрыть"
@@ -278,7 +275,7 @@ export default function AddFood({ onClose, editingEntry, initialMeal }: Props) {
                 haptic('light')
                 setMeal(m.value)
               }}
-              className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ${
+              className={`min-h-[44px] whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ${
                 meal === m.value ? 'bg-ink text-white' : 'bg-card text-ink shadow-card'
               }`}
             >
@@ -320,22 +317,6 @@ export default function AddFood({ onClose, editingEntry, initialMeal }: Props) {
               </div>
             )}
 
-            {/* Способы добавления сворачиваем, если вход из секции дневника */}
-            {initialMeal && (
-              <button
-                onClick={() => {
-                  haptic('light')
-                  setModesOpen((v) => !v)
-                }}
-                className="flex items-center gap-2 rounded-3xl bg-card p-4 text-left shadow-card"
-              >
-                <span className="flex-1 text-sm font-semibold">Другие способы</span>
-                <span className="text-muted">{modesOpen ? '⌃' : '⌄'}</span>
-              </button>
-            )}
-
-            {modesOpen && (
-              <>
             <div className="flex flex-col gap-2">
               <ModeButton
                 icon={<Camera size={20} />}
@@ -357,6 +338,7 @@ export default function AddFood({ onClose, editingEntry, initialMeal }: Props) {
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
+              <GridModeButton icon={<History size={18} />} title="Повторить вчера" subtitle="Выбрать блюда" onClick={() => setMode('yesterday')} />
               <GridModeButton
                 icon={<Search size={18} />}
                 title="Быстрый поиск"
@@ -394,8 +376,6 @@ export default function AddFood({ onClose, editingEntry, initialMeal }: Props) {
                 }}
               />
             </div>
-              </>
-            )}
           </div>
         )}
 
@@ -542,6 +522,7 @@ export default function AddFood({ onClose, editingEntry, initialMeal }: Props) {
           </div>
         )}
 
+        <Suspense fallback={<p role="status" className="p-6 text-center">Загрузка…</p>}>
         {/* Фото */}
         {mode === 'photo' && (
           <ScanFood onConfirm={handlePhotoConfirm} onManual={() => setMode('manual')} />
@@ -565,6 +546,7 @@ export default function AddFood({ onClose, editingEntry, initialMeal }: Props) {
         {mode === 'favorites' && (
           <FavoritesTab meal={meal} onAdded={onClose} />
         )}
+        </Suspense>
       </motion.div>
     </div>
   )

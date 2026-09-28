@@ -1,6 +1,9 @@
 // Обёртка над Telegram WebApp SDK.
 // Безопасно работает и вне Telegram (в обычном браузере при разработке).
-import WebApp from '@twa-dev/sdk'
+type TelegramSdk = typeof import('@twa-dev/sdk').default
+// SDK уже загружен скриптом в index.html. Не включаем вторую копию в стартовый JS.
+let WebApp = (window as Window & { Telegram?: { WebApp?: TelegramSdk } }).Telegram?.WebApp
+let sdkFallback: Promise<void> | undefined
 import {
   getCapturedInitData,
   getInitDataSource,
@@ -9,9 +12,21 @@ import {
 } from './initData'
 
 export function initTelegram() {
+  if (!WebApp) {
+    // Если CDN Telegram недоступен, используем локальный чанк SDK.
+    sdkFallback ??= import('@twa-dev/sdk').then((module) => {
+      WebApp = module.default
+      configureTelegram()
+    }).catch(() => { /* Подпись уже сохранена initData.ts; PWA остаётся доступна. */ })
+    return sdkFallback
+  }
+  configureTelegram()
+}
+
+function configureTelegram() {
   try {
-    WebApp.ready()
-    WebApp.expand()
+    WebApp?.ready()
+    WebApp?.expand()
   } catch {
     // Вне Telegram SDK может бросать — игнорируем для локальной разработки.
   }
@@ -36,7 +51,7 @@ export function isInTelegram(): boolean {
 export function getInitData(): string {
   let fromSdk = ''
   try {
-    fromSdk = WebApp.initData ?? ''
+    fromSdk = WebApp?.initData ?? ''
   } catch {
     fromSdk = ''
   }
@@ -50,7 +65,7 @@ export function getInitData(): string {
 // Откуда получена подпись — показываем на экране диагностики.
 export function initDataSource(): InitDataSource {
   try {
-    if (WebApp.initData) return 'sdk'
+    if (WebApp?.initData) return 'sdk'
   } catch {
     /* вне Telegram */
   }
@@ -61,7 +76,7 @@ export function initDataSource(): InitDataSource {
 // Фиктивный dev-пользователь остаётся ТОЛЬКО в локальной разработке —
 // в проде вне Telegram работает экран входа (PWA).
 export function getTelegramUser(): { id: number; username: string | null } | null {
-  const user = WebApp.initDataUnsafe?.user
+  const user = WebApp?.initDataUnsafe?.user
   if (user) {
     return { id: user.id, username: user.username ?? null }
   }
@@ -74,7 +89,7 @@ export function getTelegramUser(): { id: number; username: string | null } | nul
 // Платформа Telegram: "android" | "ios" | "tdesktop" | "weba" | "unknown" и т.п.
 export function getTelegramPlatform(): string {
   try {
-    return WebApp.platform ?? 'unknown'
+    return WebApp?.platform ?? 'unknown'
   } catch {
     return 'unknown'
   }
@@ -82,7 +97,7 @@ export function getTelegramPlatform(): string {
 
 export function getColorScheme(): 'light' | 'dark' {
   try {
-    return WebApp.colorScheme ?? 'light'
+    return WebApp?.colorScheme ?? 'light'
   } catch {
     return 'light'
   }
@@ -91,7 +106,7 @@ export function getColorScheme(): 'light' | 'dark' {
 // Тактильная отдача (haptics). Безопасно вызывается везде.
 export function haptic(type: 'light' | 'medium' | 'heavy' = 'medium') {
   try {
-    WebApp.HapticFeedback.impactOccurred(type)
+    WebApp?.HapticFeedback.impactOccurred(type)
   } catch {
     /* no-op вне Telegram */
   }
@@ -99,7 +114,7 @@ export function haptic(type: 'light' | 'medium' | 'heavy' = 'medium') {
 
 export function hapticSuccess() {
   try {
-    WebApp.HapticFeedback.notificationOccurred('success')
+    WebApp?.HapticFeedback.notificationOccurred('success')
   } catch {
     /* no-op */
   }

@@ -1,9 +1,10 @@
+import './lib/initData'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 // ВАЖНО: перехват подписи Telegram должен произойти ДО монтирования роутера,
 // поэтому модуль импортируется первым (он читает адресную строку при загрузке).
-import './lib/initData'
+
 import App from './App'
 import './index.css'
 import { initTelegram } from './lib/telegram'

@@ -1,14 +1,11 @@
-// Нижняя навигация: Дневник · Прогресс · Профиль.
-// Убирает тупики (раньше Прогресс и Профиль открывались только из Home
-// и закрывались через navigate(-1)) и снимает чёрную кнопку с полотна Home.
+// Две основные вкладки; профиль и прогресс доступны через аватар.
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ClipboardList, TrendingUp, User } from 'lucide-react'
+import { ClipboardList, Dumbbell } from 'lucide-react'
 import { haptic } from '../lib/telegram'
 
 const TABS = [
-  { path: '/', label: 'Дневник', Icon: ClipboardList },
-  { path: '/progress', label: 'Прогресс', Icon: TrendingUp },
-  { path: '/profile', label: 'Профиль', Icon: User },
+  { path: '/', label: 'Питание', Icon: ClipboardList },
+  { path: '/activity', label: 'Активность', Icon: Dumbbell },
 ]
 
 export default function TabBar() {
@@ -26,6 +23,7 @@ export default function TabBar() {
           return (
             <button
               key={path}
+              aria-current={active ? 'page' : undefined}
               onClick={() => {
                 haptic('light')
                 navigate(path)

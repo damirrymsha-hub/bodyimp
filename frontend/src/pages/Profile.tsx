@@ -1,10 +1,10 @@
-// Профиль: одна объединённая форма данных + live-расчёт норм + норма воды.
+// Профиль: личные данные, расчёт норм и переход в прогресс.
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Droplet, Flame } from 'lucide-react'
+import { ChevronLeft, Flame } from 'lucide-react'
 import { useUserStore } from '../store/userStore'
 import { useUIStore } from '../store/uiStore'
-import { updateUser, updateWaterGoal } from '../api/client'
+import { updateUser } from '../api/client'
 import { haptic } from '../lib/telegram'
 import { calculateNutrition } from '../utils/nutritionCalc'
 import TabBar from '../components/TabBar'
@@ -39,11 +39,6 @@ export default function Profile() {
     user?.activity_level ?? 'moderate',
   )
   const [saving, setSaving] = useState(false)
-
-  // Вода.
-  const [editingWater, setEditingWater] = useState(false)
-  const [waterInput, setWaterInput] = useState(String(user?.daily_water_ml ?? 2000))
-  const [savingWater, setSavingWater] = useState(false)
 
   // Live-расчёт норм (пересчитывается при любом изменении формы).
   const calc = useMemo(() => {
@@ -88,25 +83,6 @@ export default function Profile() {
     }
   }
 
-  async function saveWater() {
-    if (!telegramId) return
-    const ml = Number(waterInput)
-    if (!(ml >= 500 && ml <= 5000)) {
-      showToast('Норма воды: от 500 до 5000 мл', 'error')
-      return
-    }
-    setSavingWater(true)
-    try {
-      const updated = await updateWaterGoal(telegramId, ml)
-      setUser(updated)
-      showToast('Норма воды обновлена', 'success')
-      setEditingWater(false)
-    } catch {
-      showToast('Не удалось сохранить', 'error')
-    } finally {
-      setSavingWater(false)
-    }
-  }
 
   return (
     <div className="min-h-screen px-5 pb-28 pt-6">
@@ -266,46 +242,7 @@ export default function Profile() {
         </div>
       </section>
 
-      {/* Цели приложения — только норма воды */}
-      <section className="mt-6">
-        <h2 className="mb-2 px-1 text-xs font-semibold uppercase text-muted">Цели</h2>
-        <div className="rounded-3xl bg-card p-4 shadow-card">
-          <button
-            onClick={() => {
-              haptic('light')
-              setEditingWater((v) => !v)
-            }}
-            className="flex w-full items-center gap-3 text-left"
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-water/10">
-              <Droplet size={18} className="text-water" />
-            </div>
-            <span className="flex-1 text-sm font-medium">Дневная норма воды</span>
-            <span className="text-sm text-muted">{user.daily_water_ml ?? 2000} мл</span>
-          </button>
-
-          {editingWater && (
-            <div className="mt-3 flex items-center gap-2">
-              <input
-                type="number"
-                min={500}
-                max={5000}
-                value={waterInput}
-                onChange={(e) => setWaterInput(e.target.value)}
-                className="input flex-1"
-                placeholder="мл (500–5000)"
-              />
-              <button
-                onClick={saveWater}
-                disabled={savingWater}
-                className="rounded-2xl bg-ink px-5 py-3 text-sm font-semibold text-white disabled:opacity-40"
-              >
-                {savingWater ? '…' : 'Сохранить'}
-              </button>
-            </div>
-          )}
-        </div>
-      </section>
+      <button onClick={() => navigate('/progress')} className="mt-6 flex min-h-[52px] w-full items-center justify-between rounded-3xl bg-card p-4 text-sm font-semibold shadow-card">Мой прогресс <span>›</span></button>
 
       <TabBar />
     </div>

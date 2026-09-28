@@ -31,6 +31,9 @@ import { enqueueFood, flushQueue } from '../lib/offlineQueue'
 import { apiErrorMessage } from '../lib/errors'
 import { todayISO } from '../lib/date'
 
+// Поздний ответ предыдущего дня не должен перезаписывать выбранный день.
+let dayRequest = 0
+
 export interface Totals {
   calories: number
   protein_g: number
@@ -110,7 +113,10 @@ export const useUserStore = create<UserState>((set, get) => ({
   // Загружает данные конкретного дня и делает его текущим.
   loadDay: async (date) => {
     const { user } = get()
-    set({ currentDate: date })
+    const request = ++dayRequest
+    set(get().currentDate === date
+      ? { currentDate: date, error: null }
+      : { currentDate: date, foods: [], activities: [], waterMl: 0, error: null })
     if (!user) return
     try {
       const [foods, water, activities] = await Promise.all([
@@ -118,9 +124,11 @@ export const useUserStore = create<UserState>((set, get) => ({
         getTodayWater(user.id, date),
         getTodayActivity(user.id, date),
       ])
-      set({ foods, waterMl: water.total_ml, activities })
+      if (request === dayRequest && get().user?.id === user.id) {
+        set({ foods, waterMl: water.total_ml, activities })
+      }
     } catch {
-      set({ error: 'Ошибка загрузки данных за день' })
+      if (request === dayRequest) set({ error: 'Ошибка загрузки данных за день' })
     }
   },
 

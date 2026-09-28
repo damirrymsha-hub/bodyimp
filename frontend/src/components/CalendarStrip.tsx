@@ -1,7 +1,7 @@
 // Недельный стрип (пн–вс) с навигацией по неделям.
 // Строится от ВЫБРАННОЙ даты, поэтому история за прошлые недели доступна;
 // листается свайпом влево/вправо, будущие дни не тапаются.
-import { motion } from 'framer-motion'
+import { useRef } from 'react'
 import { useUIStore } from '../store/uiStore'
 import { haptic } from '../lib/telegram'
 import { toISODate as iso, todayISO } from '../lib/date'
@@ -21,6 +21,8 @@ function startOfWeek(d: Date): Date {
 }
 
 export default function CalendarStrip() {
+  const pointer = useRef<{ x: number; y: number } | null>(null)
+  const swiped = useRef(false)
   const { selectedDate, setSelectedDate } = useUIStore()
   const today = todayISO()
   const monday = startOfWeek(new Date(selectedDate + 'T00:00:00'))
@@ -32,7 +34,8 @@ export default function CalendarStrip() {
   })
 
   const currentWeek = iso(monday) === iso(startOfWeek(new Date()))
-  const monthLabel = `${MONTHS[days[3].getMonth()]} ${days[3].getFullYear()}`
+  const selected = new Date(selectedDate + 'T00:00:00')
+  const monthLabel = `${MONTHS[selected.getMonth()]} ${selected.getFullYear()}`
 
   // Сдвиг на неделю: выбираем тот же день недели соседней недели,
   // но не уходим в будущее (там нет данных).
@@ -60,7 +63,7 @@ export default function CalendarStrip() {
               haptic('light')
               setSelectedDate(today)
             }}
-            className="rounded-full bg-ink/5 px-2.5 py-1 text-[10px] font-bold"
+            className="min-h-[44px] rounded-full bg-ink/5 px-2.5 py-1 text-[10px] font-bold"
           >
             Сегодня
           </button>
@@ -68,14 +71,21 @@ export default function CalendarStrip() {
       </div>
 
       {/* Свайп влево — следующая неделя, вправо — предыдущая */}
-      <motion.div
-        drag="x"
-        dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={0.15}
-        onDragEnd={(_, info) => {
-          if (info.offset.x < -60) shiftWeek(1)
-          else if (info.offset.x > 60) shiftWeek(-1)
+      <div
+        style={{ touchAction: 'pan-y' }}
+        onPointerDown={(e) => { pointer.current = { x: e.clientX, y: e.clientY }; swiped.current = false }}
+        onPointerCancel={() => { pointer.current = null }}
+        onPointerUp={(e) => {
+          if (!pointer.current) return
+          const dx = e.clientX - pointer.current.x
+          const dy = e.clientY - pointer.current.y
+          pointer.current = null
+          if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
+            swiped.current = true
+            shiftWeek(dx < 0 ? 1 : -1)
+          }
         }}
+        onClickCapture={(e) => { if (swiped.current) { e.preventDefault(); e.stopPropagation(); swiped.current = false } }}
         className="flex justify-between gap-1"
       >
         {days.map((d, i) => {
@@ -91,7 +101,7 @@ export default function CalendarStrip() {
                 haptic('light')
                 setSelectedDate(key)
               }}
-              className="flex flex-1 flex-col items-center gap-1.5"
+              className="flex min-h-[44px] flex-1 flex-col items-center gap-1.5"
             >
               <span
                 className={`text-[10px] font-bold ${
@@ -116,7 +126,7 @@ export default function CalendarStrip() {
             </button>
           )
         })}
-      </motion.div>
+      </div>
     </div>
   )
 }

@@ -1,5 +1,4 @@
 // Всплывающие уведомления (toast). Управляются через uiStore.
-import { AnimatePresence, motion } from 'framer-motion'
 import { useUIStore } from '../store/uiStore'
 
 export default function Toasts() {
@@ -7,13 +6,11 @@ export default function Toasts() {
 
   return (
     <div className="pointer-events-none fixed inset-x-0 top-3 z-50 flex flex-col items-center gap-2 px-4">
-      <AnimatePresence>
+
         {toasts.map((t) => (
-          <motion.div
+          <button type="button" role="status"
             key={t.id}
-            initial={{ opacity: 0, y: -16 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -16 }}
+
             onClick={() => dismissToast(t.id)}
             className={`pointer-events-auto w-full max-w-sm rounded-2xl px-4 py-3 text-sm font-medium shadow-card ${
               t.type === 'error'
@@ -24,9 +21,9 @@ export default function Toasts() {
             }`}
           >
             {t.message}
-          </motion.div>
+          </button>
         ))}
-      </AnimatePresence>
+
     </div>
   )
 }

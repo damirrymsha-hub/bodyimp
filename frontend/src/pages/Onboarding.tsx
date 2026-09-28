@@ -242,10 +242,6 @@ export default function Onboarding() {
                     <span className="text-muted">С активностью (TDEE)</span>
                     <span className="font-semibold">{result.tdee} ккал</span>
                   </div>
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className="text-muted">💧 Норма воды</span>
-                    <span className="font-semibold">{result.daily_water_ml} мл</span>
-                  </div>
                 </div>
               )}
 
