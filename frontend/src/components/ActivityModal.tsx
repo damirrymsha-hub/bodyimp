@@ -1,3 +1,4 @@
+import { useSheet } from '../hooks/useSheet'
 // Bottom-sheet модалка добавления тренировки: вид активности + время + превью калорий.
 import { useState } from 'react'
 import { motion } from 'framer-motion'
@@ -33,9 +34,13 @@ interface Props {
 }
 
 export default function ActivityModal({ onClose }: Props) {
+  const sheetRef = useSheet(onClose)
   const { user, addActivity } = useUserStore()
   const [selected, setSelected] = useState<ActivityType>('walking')
   const [duration, setDuration] = useState<number>(30)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const valid = Number.isInteger(duration) && duration >= 1 && duration <= 600
 
   // Превью сожжённых калорий (та же формула, что на бэкенде).
   const activity = ACTIVITIES.find((a) => a.id === selected)!
@@ -43,11 +48,17 @@ export default function ActivityModal({ onClose }: Props) {
   const estimated = Math.round(activity.perMin * duration * factor)
 
   async function confirm() {
-    if (duration <= 0) return
+    if (!valid || saving) return
+    setSaving(true)
+    setError('')
     haptic('light')
-    await addActivity(selected, duration)
-    hapticSuccess()
-    onClose()
+    try {
+      await addActivity(selected, duration)
+      hapticSuccess()
+      onClose()
+    } catch {
+      setError('Не удалось сохранить. Проверь соединение и попробуй ещё раз.')
+    } finally { setSaving(false) }
   }
 
   return (
@@ -55,13 +66,13 @@ export default function ActivityModal({ onClose }: Props) {
       className="fixed inset-0 z-40 flex items-end justify-center bg-black/40"
       onClick={onClose}
     >
-      <motion.div
+      <motion.div ref={sheetRef} role="dialog" aria-modal="true" aria-label="Добавить активность" tabIndex={-1}
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 28, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-t-[2rem] bg-bg p-5 pb-8"
+        className="sheet-panel w-full max-w-md rounded-t-[2rem] bg-bg p-5 pb-8"
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold">Добавить активность</h2>
@@ -79,6 +90,7 @@ export default function ActivityModal({ onClose }: Props) {
           {ACTIVITIES.map((a) => (
             <button
               key={a.id}
+              aria-pressed={selected === a.id}
               onClick={() => {
                 haptic('light')
                 setSelected(a.id)
@@ -102,6 +114,8 @@ export default function ActivityModal({ onClose }: Props) {
           </span>
           <input
             type="number"
+            aria-label="Продолжительность, мин"
+            inputMode="numeric"
             min={1}
             max={600}
             value={duration}
@@ -111,17 +125,20 @@ export default function ActivityModal({ onClose }: Props) {
         </div>
 
         {/* Превью калорий */}
-        {duration > 0 && (
+        {valid && (
           <div className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-steps/10 py-3 text-sm font-semibold text-steps">
             <Flame size={18} /> Сожжёт примерно: {estimated} ккал
           </div>
         )}
 
+        {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
+        {!valid && <p className="mt-3 text-sm text-muted">Укажи от 1 до 600 минут.</p>}
         <button
           onClick={confirm}
+          disabled={!valid || saving}
           className="mt-5 w-full rounded-2xl bg-ink py-4 text-sm font-semibold text-white"
         >
-          Подтвердить
+          {saving ? 'Сохранение…' : 'Добавить активность'}
         </button>
       </motion.div>
     </div>

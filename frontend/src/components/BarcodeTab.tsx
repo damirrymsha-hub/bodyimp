@@ -93,6 +93,7 @@ export default function BarcodeTab({ meal, onAdded }: Props) {
         <div className="flex flex-1 items-center gap-2 rounded-2xl bg-card px-4 py-3 shadow-card">
           <Barcode size={18} className="text-muted" />
           <input
+            aria-label="Цифры под штрихкодом"
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
             inputMode="numeric"

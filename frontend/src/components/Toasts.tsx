@@ -14,9 +14,9 @@ export default function Toasts() {
             onClick={() => dismissToast(t.id)}
             className={`pointer-events-auto w-full max-w-sm rounded-2xl px-4 py-3 text-sm font-medium shadow-card ${
               t.type === 'error'
-                ? 'bg-red-500 text-white'
+                ? 'bg-red-700 text-white'
                 : t.type === 'success'
-                  ? 'bg-emerald-500 text-white'
+                  ? 'bg-emerald-700 text-white'
                   : 'bg-ink text-white'
             }`}
           >

@@ -64,18 +64,15 @@ export default function Home() {
   const { weekday, label } = dayParts(selectedDate)
   const initial = (user.username?.[0] ?? 'Я').toUpperCase()
 
-  // «Перекусы» показываем, только если непусто или остальные секции заполнены —
-  // иначе экран растёт впустую.
-  const mainFilled = MEALS.slice(0, 3).every((m) => byMeal[m.key].length > 0)
 
   return (
-    <div className="relative min-h-screen px-5 pb-[150px] pt-6">
+    <div className="relative min-h-screen px-5 pb-28 pt-6">
       <div className="flex flex-col gap-4">
         {/* Шапка: день недели + дата, стрик, аватар */}
         <header className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="text-xs font-medium text-muted">{weekday}</div>
-            <h1 className="truncate text-xl font-extrabold">{label}</h1>
+            <h1 className="text-xl font-extrabold leading-tight">{label}</h1>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {streak >= 2 && (
@@ -123,7 +120,7 @@ export default function Home() {
               />
             </div>
           </div>
-          <div className="mt-3 text-center text-[11px] font-medium text-muted">
+          <div className="mt-3 text-center text-xs font-medium text-muted">
             съедено {Math.round(t.calories)}
             {burned > 0 && <> · сожжено {burned}</>} · норма {calGoal}
           </div>
@@ -153,53 +150,22 @@ export default function Home() {
 
           {MEALS.map((m) => {
             const items = byMeal[m.key]
-            if (m.key === 'snack' && items.length === 0 && !mainFilled) return null
             const sum = Math.round(
               items.reduce((s, f) => s + f.calories, 0),
             )
             return (
-              <div key={m.key} className="flex flex-col gap-2">
-                <div className="flex items-center justify-between px-1">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted">
-                    {m.label}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {items.length > 0 && (
-                      <span className="text-xs font-bold">{sum} ккал</span>
-                    )}
-                    <button
-                      onClick={() => {
-                        haptic('light')
-                        setAdding({ meal: m.key })
-                      }}
-                      className="flex h-11 w-11 items-center justify-center rounded-full bg-ink/5"
-                      aria-label={m.add}
-                    >
-                      <Plus size={18} />
-                    </button>
-                  </div>
-                </div>
-                {items.length === 0 ? (
-                  <button
-                    onClick={() => {
-                      haptic('light')
-                      setAdding({ meal: m.key })
-                    }}
-                    className="rounded-2xl bg-ink/[0.035] py-3 text-center text-xs font-semibold text-muted"
-                  >
-                    {m.add}
-                  </button>
-                ) : (
-                  items.map((f) => (
-                    <FoodItem key={f.id} entry={f} onEdit={setEditing} />
-                  ))
-                )}
+              <div key={m.key} className="overflow-hidden rounded-3xl bg-card shadow-card">
+                <button onClick={() => { haptic('light'); setAdding({ meal: m.key }) }} aria-label={m.add} className="flex min-h-[64px] w-full items-center gap-3 px-4 py-3 text-left">
+                  <span className="flex-1"><span className="block text-sm font-semibold">{m.label}</span><span className="mt-0.5 block text-xs text-muted">{items.length ? sum + ' ккал' : 'Добавить еду'}</span></span>
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-ink/5"><Plus size={18} /></span>
+                </button>
+                {items.length > 0 && <div className="flex flex-col gap-2 border-t border-ink/5 p-2">{items.map((f) => <FoodItem key={f.id} entry={f} onEdit={setEditing} />)}</div>}
               </div>
             )
           })}
         </section>
 
-        <p className="px-1 text-center text-xs text-muted">🔥 {streak} дн. подряд{avgKcal != null && <> · среднее {avgKcal} ккал</>}</p>
+        <p className="px-1 text-center text-xs text-muted">{avgKcal != null && <>Среднее за неделю · {avgKcal} ккал</>}</p>
       </div>
 
       <TabBar />
@@ -244,9 +210,9 @@ function MacroMini({
     <div className="flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-1">
         <span className="text-xs font-semibold">{label}</span>
-        <span className="text-[11px] font-medium text-muted">
+        <span className="text-xs font-medium text-muted">
           {Math.round(current)}
-          {goal > 0 && `/${goal}`}
+          {goal > 0 && ` / ${goal}`} г
         </span>
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-ink/5">

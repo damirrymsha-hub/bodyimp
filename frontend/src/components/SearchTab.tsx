@@ -1,6 +1,6 @@
 // Вкладка быстрого поиска: поле поиска (дебаунс 300мс), фильтр категорий,
 // карточки продуктов с кнопками ⭐ (избранное) и + (добавить через AmountModal).
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { History, Search, Star, Plus } from 'lucide-react'
 import {
@@ -27,6 +27,9 @@ export default function SearchTab({ meal, onAdded }: Props) {
   const [category, setCategory] = useState<string>(ALL)
   const [categories, setCategories] = useState<string[]>([])
   const [results, setResults] = useState<SearchFood[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [retry, setRetry] = useState(0)
   const [selected, setSelected] = useState<SearchFood | null>(null)
   const [recents, setRecents] = useState<FoodEntry[]>([])
   const { user, addFood, isFavorite, addFavorite, removeFavorite, favoriteByName } =
@@ -63,32 +66,23 @@ export default function SearchTab({ meal, onAdded }: Props) {
       .catch(() => setCategories([]))
   }, [])
 
-  // Дебаунс поиска 300мс.
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  // Старый запрос не должен заменять результаты нового поиска.
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      // Если выбрана категория (не "Все") и поле пустое — показываем категорию.
-      if (category !== ALL && !query.trim()) {
-        getFoodsByCategory(category)
-          .then(setResults)
-          .catch(() => setResults([]))
-      } else {
-        searchFoods(query.trim())
-          .then((items) =>
-            setResults(
-              category === ALL
-                ? items
-                : items.filter((f) => f.category === category),
-            ),
-          )
-          .catch(() => setResults([]))
-      }
+    let cancelled = false
+    setLoading(true)
+    setError('')
+    const timer = setTimeout(async () => {
+      try {
+        const items = category !== ALL && !query.trim()
+          ? await getFoodsByCategory(category)
+          : await searchFoods(query.trim())
+        if (!cancelled) setResults(category === ALL ? items : items.filter((f) => f.category === category))
+      } catch {
+        if (!cancelled) setError('Не удалось загрузить продукты.')
+      } finally { if (!cancelled) setLoading(false) }
     }, 300)
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-    }
-  }, [query, category])
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [query, category, retry])
 
   const chips = useMemo(() => [ALL, ...categories], [categories])
 
@@ -117,10 +111,12 @@ export default function SearchTab({ meal, onAdded }: Props) {
       <div className="flex items-center gap-2 rounded-2xl bg-card px-4 py-3 shadow-card">
         <Search size={18} className="text-muted" />
         <input
+          aria-label="Поиск продукта"
+          type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Поиск продукта"
-          className="w-full bg-transparent text-sm outline-none"
+          className="w-full bg-transparent text-base"
         />
       </div>
 
@@ -129,6 +125,7 @@ export default function SearchTab({ meal, onAdded }: Props) {
         {chips.map((c) => (
           <button
             key={c}
+            aria-pressed={category === c}
             onClick={() => {
               haptic('light')
               setCategory(c)
@@ -154,15 +151,15 @@ export default function SearchTab({ meal, onAdded }: Props) {
               className="flex items-center gap-2 rounded-3xl bg-card p-3 shadow-card"
             >
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold">{r.name}</div>
-                <div className="text-[11px] font-medium text-muted">
+                <div className="break-words text-sm font-semibold">{r.name}</div>
+                <div className="text-xs font-medium text-muted">
                   {Math.round(r.calories)} ккал · Б {Math.round(r.protein_g)} · Ж{' '}
                   {Math.round(r.fat_g)} · У {Math.round(r.carbs_g)}
                 </div>
               </div>
               <button
                 onClick={() => quickAdd(r)}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-white"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ink text-white"
                 aria-label="Добавить снова"
               >
                 <Plus size={18} />
@@ -176,8 +173,10 @@ export default function SearchTab({ meal, onAdded }: Props) {
       )}
 
       {/* Результаты */}
+      {loading && <p role="status" className="py-6 text-center text-sm text-muted">Ищем продукты…</p>}
+      {error && <div role="alert" className="py-4 text-center text-sm"><p>{error}</p><button onClick={() => setRetry((n) => n + 1)} className="mt-2 rounded-xl bg-ink px-4 text-white">Повторить</button></div>}
       <div className="flex flex-col gap-2">
-        {results.map((f) => {
+        {!loading && !error && results.map((f) => {
           const fav = isFavorite(f.name)
           return (
             <div
@@ -194,8 +193,8 @@ export default function SearchTab({ meal, onAdded }: Props) {
               {/* Избранное */}
               <button
                 onClick={() => toggleFav(f)}
-                className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-ink/5"
-                aria-label="В избранное"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-ink/5"
+                aria-pressed={fav} aria-label={(fav ? "Убрать из избранного: " : "В избранное: ") + f.name}
               >
                 <Star
                   size={18}
@@ -209,15 +208,15 @@ export default function SearchTab({ meal, onAdded }: Props) {
                   haptic('light')
                   setSelected(f)
                 }}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-ink text-white"
-                aria-label="Добавить"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ink text-white"
+                aria-label={"Добавить: " + f.name}
               >
                 <Plus size={18} />
               </button>
             </div>
           )
         })}
-        {results.length === 0 && (
+        {!loading && !error && results.length === 0 && (
           <div className="py-8 text-center text-sm text-muted">
             Ничего не найдено
           </div>

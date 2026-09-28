@@ -17,40 +17,26 @@ export const ACTIVITY_LABELS: Record<ActivityType, string> = {
   strength: 'Силовая',
 }
 
-// Условная «шкала дня» для бара сожжённых калорий.
-const BURN_SCALE = 600
+// Показываем расход без произвольной цели сжигания калорий.
+
 
 export default function ActivityCard() {
   const { burnedTotal } = useUserStore()
   const [showModal, setShowModal] = useState(false)
   const burned = burnedTotal()
-  const pct = Math.min((burned / BURN_SCALE) * 100, 100)
 
   return (
     <div className="flex flex-col gap-3 rounded-3xl bg-card p-4 shadow-card">
       <div className="flex items-center justify-between">
-        <span className="text-[13px] font-semibold">Активность</span>
-        <button
-          onClick={() => {
-            haptic('light')
-            setShowModal(true)
-          }}
-          className="-mr-1 -mt-1 flex h-11 w-11 items-center justify-center rounded-full bg-steps/10 text-steps"
-          aria-label="Добавить тренировку"
-        >
-          <Plus size={18} />
-        </button>
+        <span className="text-[13px] font-semibold">Движение за день</span>
+
       </div>
       <div className="flex items-baseline gap-1">
         <span className="text-2xl font-extrabold leading-none">{burned}</span>
         <span className="text-xs font-medium text-muted">ккал</span>
       </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-ink/5">
-        <div
-          className="h-full rounded-full bg-steps"
-          style={{ width: `${pct}%`, transition: 'width 0.5s ease' }}
-        />
-      </div>
+      <p className="text-xs text-muted">Оценка расхода по записанным тренировкам</p>
+      <button onClick={() => { haptic('light'); setShowModal(true) }} className="flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-ink px-4 text-sm font-semibold text-white"><Plus size={18} />Добавить активность</button>
 
       <AnimatePresence>
         {showModal && <ActivityModal onClose={() => setShowModal(false)} />}

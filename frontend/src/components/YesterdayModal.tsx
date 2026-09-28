@@ -1,3 +1,4 @@
+import { useSheet } from '../hooks/useSheet'
 // «Повторить вчера»: bottom-sheet со списком вчерашних блюд.
 // Пользователь выбирает галочками, что добавить в текущий день.
 import { useEffect, useState } from 'react'
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export default function YesterdayModal({ onClose }: Props) {
+  const sheetRef = useSheet(onClose)
   const { user, addFood, currentDate } = useUserStore()
   const { showToast } = useUIStore()
   const [items, setItems] = useState<FoodEntry[]>([])
@@ -78,13 +80,13 @@ export default function YesterdayModal({ onClose }: Props) {
       className="fixed inset-0 z-40 flex items-end justify-center bg-black/40"
       onClick={onClose}
     >
-      <motion.div
+      <motion.div ref={sheetRef} role="dialog" aria-modal="true" aria-label="Вчерашние блюда" tabIndex={-1}
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 28, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-t-[2rem] bg-bg p-5 pb-8"
+        className="sheet-panel max-h-[80vh] w-full max-w-md overflow-y-auto rounded-t-[2rem] bg-bg p-5 pb-8"
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-bold">Вчерашние блюда</h2>
@@ -126,7 +128,7 @@ export default function YesterdayModal({ onClose }: Props) {
                     <span className="block truncate text-sm font-semibold">
                       {f.name}
                     </span>
-                    <span className="block text-[11px] font-medium text-muted">
+                    <span className="block text-xs font-medium text-muted">
                       {Math.round(f.calories)} ккал · Б {Math.round(f.protein_g)} · Ж{' '}
                       {Math.round(f.fat_g)} · У {Math.round(f.carbs_g)}
                     </span>

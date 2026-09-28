@@ -14,12 +14,23 @@ body,
 
 body {
   margin: 0;
-  background-color: #f6f7f9;
-  color: #1a1a1a;
+  background-color: #f5f7f4;
+  color: #182a23;
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   /* Безопасные зоны Telegram / iOS */
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Единые доступные элементы управления, включая iOS без увеличения при вводе. */
+button, input, textarea, select { font-family: inherit; }
+button { min-height: 44px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+button:disabled { cursor: not-allowed; }
+:focus-visible { outline: 3px solid #347858; outline-offset: 3px; }
+input, textarea, select { scroll-margin-block: 100px; }
+.sheet-panel { max-height: 90vh; max-height: 90dvh; overflow-y: auto; overscroll-behavior: contain; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
 
 /* Скрываем скроллбары в горизонтальных стрипах */
@@ -34,7 +45,7 @@ body {
 @layer components {
   /* Базовый стиль текстовых полей формы */
   .input {
-    @apply w-full rounded-2xl bg-card px-4 py-3 text-sm font-medium text-ink shadow-card outline-none placeholder:text-muted focus:ring-2 focus:ring-ink/10;
+    @apply w-full min-h-[48px] rounded-2xl border border-ink/15 bg-card px-4 py-3 text-base font-medium text-ink outline-none placeholder:text-muted focus:border-ink focus:ring-2 focus:ring-ink/10;
   }
 }
 

@@ -1,3 +1,4 @@
+import { useSheet } from '../hooks/useSheet'
 // Модальное окно добавления/редактирования еды.
 // Режимы: вручную (с пересчётом порции/100 г) / фото / быстрый поиск.
 // Если передан editingEntry — окно открывается сразу в режиме правки.
@@ -5,6 +6,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   X,
+  ArrowLeft,
   PencilLine,
   Camera,
   Search,
@@ -67,6 +69,7 @@ interface Props {
 export default function AddFood({ onClose, editingEntry, initialMeal, initialMode = 'menu' }: Props) {
   const isEditing = !!editingEntry
   const [mode, setMode] = useState<Mode>(isEditing ? 'manual' : initialMode)
+  const sheetRef = useSheet(onClose, mode !== 'yesterday')
   const [meal, setMeal] = useState<MealType>(
     editingEntry?.meal_type ?? initialMeal ?? mealByTime(),
   )
@@ -225,17 +228,18 @@ export default function AddFood({ onClose, editingEntry, initialMeal, initialMod
   if (mode === 'yesterday') return <Suspense fallback={<div role="status" className="fixed inset-0 z-40 flex items-center justify-center bg-bg">Загрузка блюд…</div>}><YesterdayModal onClose={onClose} /></Suspense>
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40">
-      <motion.div
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40" onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
+      <motion.div ref={sheetRef} role="dialog" aria-modal="true" aria-label={isEditing ? 'Редактировать еду' : 'Добавить еду'} tabIndex={-1}
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-[2rem] bg-bg p-5 pb-8"
+        className="sheet-panel max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-[2rem] bg-bg p-5 pb-8"
       >
         {/* Заголовок */}
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold">
+          {!isEditing && mode !== 'menu' && <button onClick={() => setMode('menu')} aria-label="К способам добавления" className="mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ink/5"><ArrowLeft size={20} /></button>}
+          <h2 className="flex-1 text-lg font-bold">
             {isEditing
               ? 'Редактировать'
               : mode === 'menu'
@@ -271,6 +275,7 @@ export default function AddFood({ onClose, editingEntry, initialMeal, initialMod
           {MEALS.map((m) => (
             <button
               key={m.value}
+              aria-pressed={meal === m.value}
               onClick={() => {
                 haptic('light')
                 setMeal(m.value)
@@ -284,98 +289,25 @@ export default function AddFood({ onClose, editingEntry, initialMeal, initialMod
           ))}
         </div>
 
-        {/* Меню (редизайн 1b): 2 частых режима крупно + компактная сетка 2×2 */}
         {mode === 'menu' && (
           <div className="flex flex-col gap-4">
-            {/* Недавние — самый быстрый путь, поэтому первым блоком */}
-            {recents.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-wider text-muted">
-                  <History size={12} /> Недавние
-                </div>
-                {recents.map((r) => (
-                  <div
-                    key={r.id}
-                    className="flex items-center gap-2 rounded-3xl bg-card p-3 shadow-card"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold">{r.name}</div>
-                      <div className="text-[11px] font-medium text-muted">
-                        {Math.round(r.calories)} ккал · Б {Math.round(r.protein_g)} ·
-                        Ж {Math.round(r.fat_g)} · У {Math.round(r.carbs_g)}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => quickAddRecent(r)}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ink text-white"
-                      aria-label="Добавить снова"
-                    >
-                      <Plus size={18} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="flex flex-col gap-2">
-              <ModeButton
-                icon={<Camera size={20} />}
-                title="Сфотографировать"
-                subtitle="ИИ распознает блюдо и посчитает КБЖУ"
-                onClick={() => {
-                  haptic('light')
-                  setMode('photo')
-                }}
-              />
-              <ModeButton
-                icon={<Sparkles size={20} />}
-                title="Описать текстом"
-                subtitle="ИИ оценит КБЖУ по описанию"
-                onClick={() => {
-                  haptic('light')
-                  setMode('text')
-                }}
-              />
-            </div>
+            {initialMeal && <div className="grid grid-cols-2 gap-2">
+              <GridModeButton icon={<Camera size={20} />} title="Фото" subtitle="Снимок блюда" onClick={() => setMode('photo')} />
+              <GridModeButton icon={<Sparkles size={20} />} title="Текст" subtitle="Опишите еду" onClick={() => setMode('text')} />
+            </div>}
             <div className="grid grid-cols-2 gap-2">
-              <GridModeButton icon={<History size={18} />} title="Повторить вчера" subtitle="Выбрать блюда" onClick={() => setMode('yesterday')} />
-              <GridModeButton
-                icon={<Search size={18} />}
-                title="Быстрый поиск"
-                subtitle="База продуктов"
-                onClick={() => {
-                  haptic('light')
-                  setMode('search')
-                }}
-              />
-              <GridModeButton
-                icon={<Barcode size={18} />}
-                title="Штрихкод"
-                subtitle="Скан упаковки"
-                onClick={() => {
-                  haptic('light')
-                  setMode('barcode')
-                }}
-              />
-              <GridModeButton
-                icon={<PencilLine size={18} />}
-                title="Вручную"
-                subtitle="Своё КБЖУ"
-                onClick={() => {
-                  haptic('light')
-                  setMode('manual')
-                }}
-              />
-              <GridModeButton
-                icon={<Star size={18} className="text-yellow-400" fill="currentColor" />}
-                title="Избранное"
-                subtitle="Частые блюда"
-                onClick={() => {
-                  haptic('light')
-                  setMode('favorites')
-                }}
-              />
+              <GridModeButton icon={<Search size={20} />} title="Быстрый поиск" subtitle="Продукты и блюда" onClick={() => setMode('search')} />
+              <GridModeButton icon={<PencilLine size={20} />} title="Вручную" subtitle="Свои калории и БЖУ" onClick={() => setMode('manual')} />
+              <GridModeButton icon={<Star size={20} />} title="Избранное" subtitle="Сохранённые продукты" onClick={() => setMode('favorites')} />
+              <GridModeButton icon={<Barcode size={20} />} title="Штрихкод" subtitle="Продукт с упаковкой" onClick={() => setMode('barcode')} />
             </div>
+            <ModeButton icon={<History size={20} />} title="Повторить вчера" subtitle="Выберите блюда для добавления" onClick={() => setMode('yesterday')} />
+            {recents.length > 0 && <section className="flex flex-col gap-2">
+              <h3 className="px-1 text-sm font-semibold">Недавние блюда</h3>
+              {recents.map((r) => <button key={r.id} onClick={() => quickAddRecent(r)} aria-label={`Добавить снова: ${r.name}`} className="flex items-center gap-3 rounded-2xl bg-card p-4 text-left">
+                <span className="min-w-0 flex-1"><span className="block break-words text-sm font-semibold">{r.name}</span><span className="text-xs text-muted">{Math.round(r.calories)} ккал</span></span><Plus size={20} />
+              </button>)}
+            </section>}
           </div>
         )}
 
@@ -573,7 +505,7 @@ function ModeButton({
       </div>
       <div className="flex-1">
         <div className="text-sm font-semibold">{title}</div>
-        <div className="mt-0.5 text-[11px] font-medium text-muted">{subtitle}</div>
+        <div className="mt-0.5 text-xs font-medium text-muted">{subtitle}</div>
       </div>
       <span className="text-base text-muted">›</span>
     </button>
@@ -595,14 +527,14 @@ function GridModeButton({
   return (
     <button
       onClick={onClick}
-      className="flex flex-col gap-2.5 rounded-3xl bg-card p-4 text-left shadow-card active:bg-ink/[0.03]"
+      className="flex flex-col gap-2 rounded-2xl bg-card p-4 text-left shadow-card active:bg-ink/[0.03]"
     >
-      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-ink/5 text-ink">
+      <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-ink/5 text-ink">
         {icon}
       </div>
       <div>
         <div className="text-[13px] font-semibold">{title}</div>
-        <div className="mt-0.5 text-[10px] font-medium text-muted">{subtitle}</div>
+        <div className="mt-0.5 text-xs font-medium text-muted">{subtitle}</div>
       </div>
     </button>
   )

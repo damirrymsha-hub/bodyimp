@@ -60,7 +60,7 @@ export function AnalysisError({
         </span>
         <div>
           <div className="text-sm font-bold">Не удалось распознать</div>
-          <div className="mt-0.5 text-[11px] font-medium text-muted">{subtitle}</div>
+          <div className="mt-0.5 text-xs font-medium text-muted">{subtitle}</div>
         </div>
       </div>
       <div className="flex gap-2">

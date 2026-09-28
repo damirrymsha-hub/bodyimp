@@ -50,24 +50,14 @@ export default function CalendarStrip() {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between px-1">
-        <span className="text-[10px] font-bold tracking-wider text-faint">
+        <span className="text-xs font-bold tracking-wider text-faint">
           {monthLabel}
         </span>
-        {currentWeek ? (
-          <span className="text-[10px] font-medium text-muted">
-            ‹ свайп по неделям ›
-          </span>
-        ) : (
-          <button
-            onClick={() => {
-              haptic('light')
-              setSelectedDate(today)
-            }}
-            className="min-h-[44px] rounded-full bg-ink/5 px-2.5 py-1 text-[10px] font-bold"
-          >
-            Сегодня
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          <button onClick={() => shiftWeek(-1)} aria-label="Предыдущая неделя" className="w-11 rounded-full text-xl text-ink">‹</button>
+          <button disabled={selectedDate === today} onClick={() => setSelectedDate(today)} className="rounded-full px-2 text-xs font-semibold text-ink disabled:opacity-40">Сегодня</button>
+          <button disabled={currentWeek} onClick={() => shiftWeek(1)} aria-label="Следующая неделя" className="w-11 rounded-full text-xl text-ink disabled:opacity-25">›</button>
+        </div>
       </div>
 
       {/* Свайп влево — следующая неделя, вправо — предыдущая */}
@@ -97,6 +87,8 @@ export default function CalendarStrip() {
             <button
               key={key}
               disabled={isFuture}
+              aria-pressed={isSelected}
+              aria-label={d.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })}
               onClick={() => {
                 haptic('light')
                 setSelectedDate(key)
@@ -104,7 +96,7 @@ export default function CalendarStrip() {
               className="flex min-h-[44px] flex-1 flex-col items-center gap-1.5"
             >
               <span
-                className={`text-[10px] font-bold ${
+                className={`text-xs font-bold ${
                   isFuture ? 'text-ink/20' : 'text-faint'
                 }`}
               >

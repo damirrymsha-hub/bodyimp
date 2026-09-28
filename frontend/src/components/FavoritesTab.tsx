@@ -57,20 +57,21 @@ export default function FavoritesTab({ meal, onAdded }: Props) {
       {favorites.map((fav) => (
         <div
           key={fav.id}
-          onClick={() => {
+          className="flex items-center gap-2 rounded-3xl bg-card p-3 shadow-card"
+        >
+          <button aria-label={`Добавить: ${fav.name}`} className="flex min-w-0 flex-1 items-center gap-2 rounded-xl text-left" onClick={() => {
             haptic('light')
             setSelected(favToSearch(fav))
-          }}
-          className="flex cursor-pointer items-center gap-2 rounded-3xl bg-card p-3 shadow-card active:bg-ink/[0.03]"
-        >
+          }}>
           <Star size={18} className="shrink-0 text-yellow-400" fill="currentColor" />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold">{fav.name}</div>
+            <div className="break-words text-sm font-semibold">{fav.name}</div>
             <div className="text-xs text-muted">
               {Math.round(fav.calories)} ккал /{' '}
               {fav.portion_type === 'piece' ? 'шт' : '100 г'}
             </div>
           </div>
+          </button>
           <button
             onClick={(e) => {
               e.stopPropagation() // не открывать выбор количества
@@ -79,8 +80,8 @@ export default function FavoritesTab({ meal, onAdded }: Props) {
                 removeFavorite(fav.id)
               }
             }}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-muted hover:bg-ink/5"
-            aria-label="Удалить из избранного"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted hover:bg-ink/5"
+            aria-label={`Удалить из избранного: ${fav.name}`}
           >
             <Trash2 size={16} />
           </button>

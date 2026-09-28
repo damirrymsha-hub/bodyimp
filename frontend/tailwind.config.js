@@ -5,12 +5,12 @@ export default {
     extend: {
       colors: {
         // Палитра минималистичного health-приложения (светлая тема).
-        bg: '#F6F7F9',
+        bg: '#F5F7F4',
         card: '#FFFFFF',
-        ink: '#1A1A1A',
+        ink: '#182A23',
         // Редизайн 1f: подписи читаемы (AA 4.6:1); старый серый — только декор.
-        muted: '#6E7480',
-        faint: '#8A8F98',
+        muted: '#5F6870',
+        faint: '#69736D',
         accent: '#111111',
         protein: '#FF7A59',
         fat: '#FFC24B',

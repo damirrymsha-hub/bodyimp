@@ -3,6 +3,7 @@
 // открывает галерею. Здесь мы сами показываем поток с камеры и снимаем кадр.
 import { useEffect, useRef, useState } from 'react'
 import { X, Camera as CameraIcon, RefreshCw } from 'lucide-react'
+import { useSheet } from '../hooks/useSheet'
 
 interface Props {
   onCapture: (file: File) => void
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function CameraCapture({ onCapture, onClose, onPickGallery }: Props) {
+  const sheetRef = useSheet(onClose)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -81,12 +83,12 @@ export default function CameraCapture({ onCapture, onClose, onPickGallery }: Pro
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-black">
+    <div ref={sheetRef} role="dialog" aria-modal="true" aria-label="Камера" tabIndex={-1} className="fixed inset-0 z-[60] flex flex-col bg-black">
       {/* Верхняя панель */}
       <div className="flex items-center justify-between p-4">
         <button
           onClick={onClose}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white"
           aria-label="Закрыть"
         >
           <X size={20} />
@@ -94,7 +96,7 @@ export default function CameraCapture({ onCapture, onClose, onPickGallery }: Pro
         {!error && (
           <button
             onClick={() => setFacing((f) => (f === 'environment' ? 'user' : 'environment'))}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white"
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white"
             aria-label="Сменить камеру"
           >
             <RefreshCw size={18} />

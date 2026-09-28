@@ -88,8 +88,9 @@ export default function Profile() {
     <div className="min-h-screen px-5 pb-28 pt-6">
       <header className="mb-6 flex items-center gap-3">
         <button
-          onClick={() => navigate(-1)}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-card shadow-card"
+          aria-label="Назад к питанию"
+          onClick={() => navigate('/')}
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-card shadow-card"
         >
           <ChevronLeft size={20} />
         </button>
@@ -107,6 +108,7 @@ export default function Profile() {
             {(['male', 'female'] as Gender[]).map((g) => (
               <button
                 key={g}
+                aria-pressed={gender === g}
                 onClick={() => setGender(g)}
                 className={`flex-1 rounded-2xl py-2.5 text-sm font-semibold ${
                   gender === g ? 'bg-ink text-white' : 'bg-ink/5 text-ink'
@@ -131,6 +133,7 @@ export default function Profile() {
             {GOALS.map((g) => (
               <button
                 key={g.value}
+                aria-pressed={goal === g.value}
                 onClick={() => setGoal(g.value)}
                 className={`flex-1 rounded-2xl px-2 py-2 text-xs font-semibold ${
                   goal === g.value ? 'bg-ink text-white' : 'bg-ink/5 text-ink'
@@ -148,16 +151,19 @@ export default function Profile() {
             Уровень активности
           </span>
           <select
+            aria-label="Уровень активности"
+            aria-describedby="activity-description"
             value={activity}
             onChange={(e) => setActivity(e.target.value as ActivityLevel)}
             className="input"
           >
             {ACTIVITIES.map((a) => (
               <option key={a.value} value={a.value}>
-                {a.label}
+                {a.label.split(' (')[0]}
               </option>
             ))}
           </select>
+          <p id="activity-description" className="mt-2 text-xs leading-relaxed text-muted">{ACTIVITIES.find((a) => a.value === activity)?.label.split(' (')[1]?.replace(/\)$/, '')}</p>
         </div>
       </section>
 
@@ -263,12 +269,15 @@ function ToggleRow({
 }) {
   return (
     <button
+      role="switch"
+      aria-checked={value}
+      aria-label={title}
       onClick={() => onChange(!value)}
       className="flex w-full items-center gap-3 rounded-3xl bg-card p-4 text-left shadow-card"
     >
       <div className="flex-1">
         <div className="text-sm font-semibold">{title}</div>
-        <div className="mt-0.5 text-[11px] font-medium text-muted">{desc}</div>
+        <div className="mt-0.5 text-xs font-medium text-muted">{desc}</div>
       </div>
       <span
         className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
@@ -297,7 +306,7 @@ function Stat({
   return (
     <div className="rounded-2xl bg-ink/5 py-3">
       <div className={`text-base font-bold ${accent ? 'text-steps' : ''}`}>{value}</div>
-      <div className="text-[11px] text-muted">{label}</div>
+      <div className="text-xs text-muted">{label}</div>
     </div>
   )
 }

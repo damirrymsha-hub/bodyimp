@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUserStore } from './userStore'
-import { getTodayFood, getTodayWater, getTodayActivity } from '../api/client'
+import { getTodayFood, getTodayWater, getTodayActivity, addActivity } from '../api/client'
 import type { FoodEntry, User } from '../types'
 
 vi.mock('../api/client')
@@ -11,6 +11,11 @@ beforeEach(() => {
   vi.mocked(getTodayActivity).mockResolvedValue([])
 })
 describe('общая дата двух вкладок', () => {
+  it('передаёт ошибку сохранения тренировки форме и не добавляет ложную запись', async () => {
+    vi.mocked(addActivity).mockRejectedValue(new Error('offline'))
+    await expect(useUserStore.getState().addActivity('walking', 30)).rejects.toThrow('offline')
+    expect(useUserStore.getState().activities).toEqual([])
+  })
   it('поздний ответ вчерашнего дня не подменяет сегодняшний', async () => {
     let yesterday!: (value: FoodEntry[]) => void
     vi.mocked(getTodayFood).mockImplementationOnce(() => new Promise((r) => { yesterday = r }))

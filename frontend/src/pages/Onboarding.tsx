@@ -399,7 +399,7 @@ function Macro({
   return (
     <div className="rounded-2xl bg-ink/5 py-3">
       <div className={`text-xl font-bold ${color}`}>{value ?? '—'}</div>
-      <div className="text-[11px] text-muted">{label}, г</div>
+      <div className="text-xs text-muted">{label}, г</div>
     </div>
   )
 }

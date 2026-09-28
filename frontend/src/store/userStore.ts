@@ -202,8 +202,9 @@ export const useUserStore = create<UserState>((set, get) => ({
     try {
       const entry = await apiAddActivity(user.id, type, durationMin, currentDate)
       set({ activities: [...get().activities, entry] })
-    } catch {
+    } catch (error) {
       set({ error: 'Не удалось добавить активность' })
+      throw error
     }
   },
 

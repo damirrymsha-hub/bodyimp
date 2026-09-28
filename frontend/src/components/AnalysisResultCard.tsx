@@ -103,7 +103,7 @@ export default function AnalysisResultCard({
             <div className="text-[15px] font-bold">{name}</div>
           )}
           {meta && !editing && (
-            <div className="mt-0.5 text-[11px] font-medium text-muted">{meta}</div>
+            <div className="mt-0.5 text-xs font-medium text-muted">{meta}</div>
           )}
         </div>
         <div className="text-right">
@@ -117,7 +117,7 @@ export default function AnalysisResultCard({
           ) : (
             <span className="text-2xl font-extrabold leading-none">{calories}</span>
           )}
-          <div className="text-[10px] font-medium text-muted">ккал</div>
+          <div className="text-xs font-medium text-muted">ккал</div>
         </div>
       </div>
 
@@ -150,7 +150,7 @@ export default function AnalysisResultCard({
       </div>
 
       {result.items && result.items.length > 0 && !editing && (
-        <div className="text-[11px] font-medium text-muted">
+        <div className="text-xs font-medium text-muted">
           Состав: {result.items.join(', ')}
         </div>
       )}
@@ -209,7 +209,7 @@ function MacroTile({
           {Math.round(Number(value) || 0)}
         </div>
       )}
-      <div className="text-[10px] font-semibold text-muted">{label}</div>
+      <div className="text-xs font-semibold text-muted">{label}</div>
     </div>
   )
 }

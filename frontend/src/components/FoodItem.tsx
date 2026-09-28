@@ -47,31 +47,28 @@ export default function FoodItem({ entry, onEdit }: Props) {
   }
 
   return (
-    <div
-      onClick={() => {
-        haptic('light')
-        onEdit(entry)
-      }}
-      className="flex cursor-pointer items-center gap-2.5 rounded-3xl bg-card p-4 shadow-card active:bg-ink/[0.03]"
-    >
+    <div className="flex items-center gap-2 rounded-2xl bg-card px-2 py-1">
+      <button onClick={() => { haptic('light'); onEdit(entry) }} aria-label={`Редактировать: ${entry.name}`} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl py-2 text-left">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           {dot && <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} aria-hidden />}
-          <span className="truncate text-sm font-semibold text-ink">{entry.name}</span>
+          <span className="break-words text-sm font-semibold text-ink">{entry.name}</span>
         </div>
-        <div className="mt-0.5 text-[11px] font-medium text-muted">
+        <div className="mt-0.5 text-xs font-medium text-muted">
           {entry.portion_size_g ? `${Math.round(entry.portion_size_g)} г · ` : ''}
           Б {Math.round(entry.protein_g)} · Ж {Math.round(entry.fat_g)} · У{' '}
           {Math.round(entry.carbs_g)}
         </div>
       </div>
-      <div className="text-sm font-bold">{Math.round(entry.calories)}</div>
+      <div className="shrink-0 text-right text-sm font-bold">{Math.round(entry.calories)}<span className="block text-xs font-normal text-muted">ккал</span></div>
+      </button>
       {/* Разделитель, чтобы промах по звезде не открывал редактирование */}
       <span className="h-6 w-px shrink-0 bg-ink/[0.07]" aria-hidden />
       <button
         onClick={toggleFav}
         className="-mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
-        aria-label={fav ? 'Убрать из избранного' : 'В избранное'}
+        aria-label={(fav ? 'Убрать из избранного: ' : 'В избранное: ') + entry.name}
+        aria-pressed={fav}
       >
         <Star
           size={18}

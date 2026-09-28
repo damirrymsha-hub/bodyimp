@@ -65,8 +65,9 @@ export default function Progress() {
       <div className="flex flex-col gap-4">
         <header className="flex items-center gap-3">
           <button
-            onClick={() => navigate(-1)}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-card shadow-card"
+            aria-label="Назад к питанию"
+          onClick={() => navigate('/')}
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-card shadow-card"
           >
             <ChevronLeft size={20} />
           </button>
@@ -98,6 +99,7 @@ export default function Progress() {
             {logging ? (
               <div className="flex gap-2">
                 <input
+                  aria-label="Текущий вес, кг"
                   value={newWeight}
                   onChange={(e) => setNewWeight(e.target.value)}
                   inputMode="decimal"
@@ -147,6 +149,7 @@ function SegBtn({
 }) {
   return (
     <button
+      aria-pressed={active}
       onClick={() => {
         haptic('light')
         onClick()
@@ -170,7 +173,7 @@ function CaloriesCard({ weekly, goal }: { weekly: WeeklyStats | null; goal: numb
     <section className="flex flex-col gap-4 rounded-[2rem] bg-card p-5 shadow-card">
       <div className="flex items-end justify-between">
         <div>
-          <div className="text-[11px] font-medium text-muted">в среднем за неделю</div>
+          <div className="text-xs font-medium text-muted">в среднем за неделю</div>
           <div className="mt-0.5 flex items-baseline gap-1.5">
             <span className="text-3xl font-extrabold leading-none">
               {weekly ? ruK(weekly.avg_calories) : '—'}
@@ -178,7 +181,7 @@ function CaloriesCard({ weekly, goal }: { weekly: WeeklyStats | null; goal: numb
             <span className="text-xs font-medium text-muted">ккал/день</span>
           </div>
         </div>
-        <span className="rounded-full bg-ink/5 px-3 py-1.5 text-[11px] font-semibold">
+        <span className="rounded-full bg-ink/5 px-3 py-1.5 text-xs font-semibold">
           цель {ruK(goal)}
         </span>
       </div>
@@ -212,7 +215,7 @@ function CaloriesCard({ weekly, goal }: { weekly: WeeklyStats | null; goal: numb
             </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-2.5 text-center text-[10px] font-semibold text-muted">
+          <div className="grid grid-cols-7 gap-2.5 text-center text-xs font-semibold text-muted">
             {days.map((d) => {
               const wd = WEEKDAYS[new Date(d.date + 'T00:00:00').getDay()]
               return (
@@ -288,14 +291,14 @@ function WeightCard({ weights }: { weights: WeightLog[] }) {
     <section className="flex flex-col gap-4 rounded-[2rem] bg-card p-5 shadow-card">
       <div className="flex items-end justify-between">
         <div>
-          <div className="text-[11px] font-medium text-muted">текущий вес</div>
+          <div className="text-xs font-medium text-muted">текущий вес</div>
           <div className="mt-0.5 flex items-baseline gap-1.5">
             <span className="text-3xl font-extrabold leading-none">{ruW(current)}</span>
             <span className="text-xs font-medium text-muted">кг</span>
           </div>
         </div>
         {pts.length >= 2 && (
-          <span className="rounded-full bg-ink/5 px-3 py-1.5 text-[11px] font-semibold">
+          <span className="rounded-full bg-ink/5 px-3 py-1.5 text-xs font-semibold">
             {delta > 0 ? '+' : '−'}
             {ruW(Math.abs(delta))} за {spanDays}{' '}
             {spanDays % 10 === 1 && spanDays % 100 !== 11 ? 'день' : 'дн.'}
@@ -315,7 +318,7 @@ function WeightCard({ weights }: { weights: WeightLog[] }) {
         )}
       </svg>
 
-      <div className="flex justify-between text-[10px] font-semibold text-muted">
+      <div className="flex justify-between text-xs font-semibold text-muted">
         <span>
           {fd.getDate()} {MONTHS_GEN[fd.getMonth()]} · {ruW(first.weight_kg)}
         </span>
@@ -353,7 +356,7 @@ function MacrosWeekCard({
                   style={{ width: `${pct}%`, transition: 'width 0.5s ease' }}
                 />
               </div>
-              <span className="w-16 text-right text-[11px] font-semibold text-muted">
+              <span className="w-16 text-right text-xs font-semibold text-muted">
                 {Math.round(r.avg)}/{r.goal}
               </span>
             </div>

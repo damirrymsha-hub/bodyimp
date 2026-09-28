@@ -13,7 +13,7 @@ export default function TabBar() {
   const { pathname } = useLocation()
 
   return (
-    <nav
+    <nav aria-label="Основные разделы"
       className="fixed bottom-0 left-1/2 z-30 w-full max-w-md -translate-x-1/2 border-t border-ink/5 bg-card/95 backdrop-blur"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
@@ -28,12 +28,12 @@ export default function TabBar() {
                 haptic('light')
                 navigate(path)
               }}
-              className={`flex h-full flex-1 flex-col items-center justify-center gap-1 ${
-                active ? 'text-ink' : 'text-faint'
+              className={`mx-2 my-1 flex h-[52px] flex-1 flex-col rounded-2xl items-center justify-center gap-1 ${
+                active ? 'text-ink bg-ink/5' : 'text-muted'
               }`}
             >
               <Icon size={20} strokeWidth={active ? 2.4 : 2} />
-              <span className="text-[10px] font-bold">{label}</span>
+              <span className="text-sm font-semibold">{label}</span>
             </button>
           )
         })}

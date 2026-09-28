@@ -1,3 +1,4 @@
+import { useSheet } from '../hooks/useSheet'
 // Мини-форма выбора количества с живым пересчётом КБЖУ.
 // Используется и в поиске, и в избранном. Граммы или штуки — по portion_type.
 import { useMemo, useState } from 'react'
@@ -24,11 +25,13 @@ interface Props {
 }
 
 export default function AmountModal({ food, initialMeal = 'snack', onClose, onAdded }: Props) {
+  const sheetRef = useSheet(onClose)
   const isPiece = food.portion_type === 'piece'
   const step = isPiece ? 1 : 10
   const minVal = isPiece ? 1 : 10
   const [amount, setAmount] = useState<number>(food.default_amount || (isPiece ? 1 : 100))
   const [meal, setMeal] = useState<MealType>(initialMeal)
+  const [saving, setSaving] = useState(false)
   const { addFood } = useUserStore()
   const { showToast } = useUIStore()
 
@@ -47,7 +50,8 @@ export default function AmountModal({ food, initialMeal = 'snack', onClose, onAd
   }, [amount, food, isPiece])
 
   async function confirm() {
-    if (amount <= 0) return
+    if (!Number.isFinite(amount) || amount <= 0 || saving) return
+    setSaving(true)
     haptic('light')
     await addFood({
       meal_type: meal,
@@ -71,13 +75,13 @@ export default function AmountModal({ food, initialMeal = 'snack', onClose, onAd
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
       onClick={onClose}
     >
-      <motion.div
+      <motion.div ref={sheetRef} role="dialog" aria-modal="true" aria-label="Количество продукта" tabIndex={-1}
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 28, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-t-[2rem] bg-bg p-5 pb-8"
+        className="sheet-panel w-full max-w-md rounded-t-[2rem] bg-bg p-5 pb-8"
       >
         <div className="mb-3 flex items-start justify-between">
           <div>
@@ -101,6 +105,7 @@ export default function AmountModal({ food, initialMeal = 'snack', onClose, onAd
         </span>
         <div className="flex items-center gap-2">
           <button
+            aria-label="Уменьшить количество"
             onClick={() => {
               haptic('light')
               setAmount((a) => Math.max(minVal, a - step))
@@ -109,9 +114,11 @@ export default function AmountModal({ food, initialMeal = 'snack', onClose, onAd
           >
             <Minus size={18} />
           </button>
-          <div className="relative flex-1">
+          <div className="relative min-w-0 flex-1">
             <input
               type="number"
+              aria-label={isPiece ? 'Количество, штук' : 'Количество, граммов'}
+              inputMode="decimal"
               value={amount}
               min={minVal}
               onChange={(e) => setAmount(Number(e.target.value))}
@@ -122,6 +129,7 @@ export default function AmountModal({ food, initialMeal = 'snack', onClose, onAd
             </span>
           </div>
           <button
+            aria-label="Увеличить количество"
             onClick={() => {
               haptic('light')
               setAmount((a) => a + step)
@@ -148,6 +156,7 @@ export default function AmountModal({ food, initialMeal = 'snack', onClose, onAd
           {MEALS.map((m) => (
             <button
               key={m.value}
+              aria-pressed={meal === m.value}
               onClick={() => setMeal(m.value)}
               className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium ${
                 meal === m.value ? 'bg-ink text-white' : 'bg-card text-ink'
@@ -160,9 +169,10 @@ export default function AmountModal({ food, initialMeal = 'snack', onClose, onAd
 
         <button
           onClick={confirm}
+          disabled={!Number.isFinite(amount) || amount <= 0 || saving}
           className="mt-5 w-full rounded-2xl bg-ink py-4 text-sm font-semibold text-white"
         >
-          Добавить · {calc.calories} ккал
+          {saving ? 'Сохранение…' : `Добавить · ${calc.calories} ккал`}
         </button>
       </motion.div>
     </div>
@@ -181,7 +191,7 @@ function Stat({
   return (
     <div>
       <div className={`text-base font-bold ${accent ? 'text-steps' : ''}`}>{value}</div>
-      <div className="text-[10px] text-muted">{label}</div>
+      <div className="text-xs text-muted">{label}</div>
     </div>
   )
 }

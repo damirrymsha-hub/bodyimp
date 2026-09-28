@@ -53,6 +53,7 @@ export default function DescribeFood({ onConfirm, onManual }: Props) {
       {!result && !loading && (
         <>
           <textarea
+            aria-label="Описание еды"
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Напр.: 2 яйца, тост с маслом и стакан сока"
