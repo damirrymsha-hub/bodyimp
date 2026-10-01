@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import CalendarStrip from '../components/CalendarStrip'
 import ActivityCard, { ActivityRows } from '../components/ActivityCard'
 import TabBar from '../components/TabBar'
+import TrainingPlan from '../components/TrainingPlan'
 import { useUserStore } from '../store/userStore'
 import { useUIStore } from '../store/uiStore'
 import { dayParts } from '../lib/date'
@@ -28,6 +29,7 @@ export default function Activity() {
         Питание · {Math.round(total.calories)} / {user.daily_calories} ккал
         <span className="mt-1 block text-muted">Белки {Math.round(total.protein_g)} / {user.daily_protein_g} г</span>
       </button>
+      <TrainingPlan selectedDate={selectedDate} />
       <ActivityCard />
       <ActivityRows />
       {activities.length === 0 && <p className="py-4 text-center text-sm text-muted">За этот день активности пока нет. Добавьте ходьбу, кардио или силовую тренировку.</p>}

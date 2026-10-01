@@ -10,6 +10,7 @@ async function main() {
   try {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' })
     const entries = []
+    let trainingProfile = null
     const errors = []
     const page = await context.newPage()
     page.on('pageerror', (e) => errors.push(e.message))
@@ -23,7 +24,21 @@ async function main() {
       if (!url.pathname.startsWith('/api/')) return route.continue()
       const path = url.pathname
       let data = []
-      if (path.startsWith('/api/users/')) data = { id: 1, telegram_id: 99000001, username: 'test', age: 25, gender: 'male', height_cm: 180, weight_kg: 80, goal: 'maintain', activity_level: 'moderate', daily_calories: 2300, daily_protein_g: 140, daily_fat_g: 70, daily_carbs_g: 280 }
+      if (path === '/api/training/program/generate') {
+        trainingProfile = route.request().postDataJSON()
+        assert.equal(trainingProfile.cardio_enabled, false)
+        assert.deepEqual(trainingProfile.cardio_weekdays, [])
+        data = { id: 1 }
+      } else if (path === '/api/training/week') {
+        const date = new Date(url.searchParams.get('start') + 'T12:00:00')
+        date.setDate(date.getDate() - (date.getDay() + 6) % 7)
+        data = { profile: trainingProfile, notes: [], days: Array.from({ length: 7 }, (_, weekday) => {
+          const day = new Date(date); day.setDate(day.getDate() + weekday)
+          return { date: `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`, program_id: 1,
+            plan: trainingProfile?.weekdays.includes(weekday) ? { title: 'Всё тело', kind: 'full', estimated_minutes: 35, cardio_minutes: 0, warmup_minutes: 5,
+              exercises: [{ id: 'squat_goblet', name: 'Приседания с гантелью у груди', pattern: 'squat', muscles: 'Ноги', sets: 2, rep_min: 10, rep_max: 20, rir_target: 3, rest_s: 120, cues: ['Держите стопы устойчиво'] }] } : null }
+        }) }
+      } else if (path.startsWith('/api/users/')) data = { id: 1, telegram_id: 99000001, username: 'test', age: 25, gender: 'male', height_cm: 180, weight_kg: 80, goal: 'maintain', activity_level: 'moderate', daily_calories: 2300, daily_protein_g: 140, daily_fat_g: 70, daily_carbs_g: 280 }
       else if (path.includes('/streak/')) data = { streak: 3 }
       else if (path.includes('/weekly/')) data = { days: [], avg_calories: 1800 }
       else if (path.includes('/water/')) data = { date: '2026-09-28', total_ml: 0 }
@@ -86,6 +101,22 @@ async function main() {
     assert.equal(entries[1].source, 'photo')
     await page.getByRole('button', { name: 'Активность', exact: true }).click()
     await page.getByRole('heading', { name: 'Активность' }).waitFor()
+    for (const toast of await page.getByRole('status').filter({ hasText: 'Добавлено' }).all()) await toast.click()
+    await page.getByRole('button', { name: 'Составить мой план' }).click()
+    await page.getByRole('button', { name: 'Далее', exact: true }).click()
+    await page.getByLabel('Гантели', { exact: true }).check()
+    await page.getByRole('button', { name: 'Далее', exact: true }).click()
+    assert.equal(await page.getByLabel('Добавить кардио в план').isChecked(), false)
+    await page.setViewportSize({ width: 320, height: 640 })
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+    await page.screenshot({ path: `${output}/training-setup-mobile.png`, fullPage: true })
+    await page.getByRole('button', { name: 'Создать план' }).click()
+    await page.getByRole('button', { name: 'Настроить', exact: true }).waitFor()
+    assert.ok(trainingProfile.equipment.includes('dumbbells'))
+    const trainingSection = page.getByRole('region', { name: 'Недельный план' })
+    await trainingSection.locator('details > summary').filter({ hasText: 'Всё тело' }).first().click()
+    await trainingSection.getByText('Приседания с гантелью у груди').first().waitFor({ state: 'visible' })
+    await page.setViewportSize({ width: 390, height: 844 })
     await page.screenshot({ path: `${output}/activity-mobile.png`, fullPage: true })
     await page.getByRole('button', { name: 'Профиль', exact: true }).click()
     await page.getByRole('heading', { name: 'Профиль', exact: true }).waitFor()
@@ -94,7 +125,7 @@ async function main() {
     await page.getByRole('heading', { name: 'Прогресс' }).waitFor()
     assert.equal(await page.locator('nav button').count(), 2)
     assert.deepEqual(errors, [])
-    console.log('PASS: 320/390/1024px, calendar buttons, nested dialogs/focus/Escape, portion calculation, text/photo meal selection, profile/progress, no runtime errors')
+    console.log('PASS: 320/390/1024px, calendar, dialogs, food/photo/text, training setup and weekly exercises, cardio consent default, profile/progress, no runtime errors')
     await context.close()
   } finally { await browser.close() }
 }

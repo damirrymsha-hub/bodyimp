@@ -10,6 +10,7 @@ import { useUIStore } from '../store/uiStore'
 import type { User, PhotoAnalysisResult } from '../types'
 
 vi.mock('../lib/telegram', () => ({ haptic: vi.fn(), hapticSuccess: vi.fn() }))
+vi.mock('../api/training', () => ({ getTrainingWeek: vi.fn().mockResolvedValue({ profile: null, notes: [], days: [] }) }))
 vi.mock('../api/client', () => ({
   getRecentFoods: vi.fn().mockResolvedValue([]),
   getStreak: vi.fn().mockResolvedValue(3),

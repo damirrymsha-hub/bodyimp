@@ -14,10 +14,21 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    JSON,
 )
 from sqlalchemy.orm import relationship
 
 from database import Base
+
+
+class TrainingProgram(Base):
+    """Новая настройка создаёт снимок: предыдущие программы остаются в истории."""
+    __tablename__ = "training_programs"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    start_date = Column(Date, nullable=False, index=True)
+    snapshot = Column(JSON, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 class User(Base):

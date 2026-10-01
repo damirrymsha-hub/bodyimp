@@ -18,7 +18,7 @@ from sqlalchemy.exc import OperationalError
 from database import ensure_initialized
 from routes import (
     user, food, analyze, water, stats, goals, activity,
-    favorites, food_search, barcode, feedback, auth,
+    favorites, food_search, barcode, feedback, auth, training,
 )
 from services.telegram_auth import (
     verify_init_data,
@@ -136,6 +136,7 @@ app.include_router(food_search.router)
 app.include_router(barcode.router)
 app.include_router(feedback.router)
 app.include_router(auth.router)
+app.include_router(training.router)
 
 
 @app.api_route("/", methods=["GET", "HEAD"])
