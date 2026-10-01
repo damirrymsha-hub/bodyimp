@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
-import { X, ChevronRight, Dumbbell, CalendarDays } from 'lucide-react'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { X, Info, Dumbbell, CalendarDays } from 'lucide-react'
 import { getTrainingWeek, saveTrainingPlan } from '../api/training'
 import type { TrainingProfile, TrainingWeek, Exercise } from '../api/training'
 import { useSheet } from '../hooks/useSheet'
 import { todayISO } from '../lib/date'
+
+const ExerciseInfo = lazy(() => import('./ExerciseInfo'))
 
 const DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 const GOALS = { health: 'Здоровье и тонус', lose: 'Похудение', recomp: 'Рекомпозиция', gain: 'Набор мышц' }
@@ -60,14 +62,15 @@ function PlanSetup({ initial, onClose, onSaved }: { initial: TrainingProfile | n
   </div>
 }
 
-function ExerciseCard({ exercise: e }: { exercise: Exercise }) {
-  return <details className="rounded-2xl bg-bg p-3"><summary className="min-h-[44px] cursor-pointer list-none"><div className="flex items-center gap-3"><Dumbbell size={20} aria-hidden="true" className="shrink-0 text-muted" /><div className="min-w-0 flex-1"><h4 className="text-sm font-semibold">{e.name}</h4><p className="mt-1 text-sm text-muted">{e.sets} × {e.rep_min}–{e.rep_max} · отдых {e.rest_s / 60} мин</p></div><ChevronRight size={16} aria-hidden="true" /></div></summary><div className="mt-3 border-t border-black/10 pt-3 text-sm"><p className="mb-2 text-muted">{e.muscles} · оставляйте примерно {e.rir_target} повтора в запасе</p><ul className="list-disc space-y-1 pl-5">{e.cues.map(cue => <li key={cue}>{cue}</li>)}</ul></div></details>
+function ExerciseCard({ exercise: e, onInfo }: { exercise: Exercise; onInfo: () => void }) {
+  return <div className="flex items-center gap-3 rounded-2xl bg-bg p-3"><Dumbbell size={20} aria-hidden="true" className="shrink-0 text-muted" /><div className="min-w-0 flex-1"><h4 className="text-sm font-semibold">{e.name}</h4><p className="mt-1 text-sm text-muted">{e.sets} × {e.rep_min}–{e.rep_max} · отдых {e.rest_s / 60} мин</p></div><button onClick={onInfo} aria-label={`Как выполнять: ${e.name}`} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card text-ink"><Info size={22} /></button></div>
 }
 
 export default function TrainingPlan({ selectedDate }: { selectedDate: string }) {
   const [week, setWeek] = useState<TrainingWeek | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [info, setInfo] = useState<Exercise | null>(null)
   const [editing, setEditing] = useState(false)
   const [revision, setRevision] = useState(0)
   useEffect(() => {
@@ -85,11 +88,12 @@ export default function TrainingPlan({ selectedDate }: { selectedDate: string })
       <p className="text-sm text-muted">{GOALS[week.profile.goal]} · {week.profile.weekdays.length} силовых дня · до {week.profile.session_minutes} мин</p>
       {week.notes.length > 0 && <p className="rounded-2xl bg-bg p-3 text-sm">{week.notes[0]}</p>}
       {week.days.map((day, index) => <details key={`${day.date}-${day.program_id}`} open={day.date === selectedDate} className={`rounded-2xl border p-3 ${day.date === selectedDate ? 'border-ink/40' : 'border-black/10'}`}><summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between gap-2"><div><span className="text-xs font-semibold text-muted">{DAYS[index]} · {day.date.slice(8)}.{day.date.slice(5, 7)}</span><h3 className="font-semibold">{day.plan?.title ?? (day.program_id ? 'Восстановление' : 'До начала программы')}</h3></div><span className="text-xs text-muted">{day.plan ? `≈ ${day.plan.estimated_minutes} мин` : '—'}</span></summary>
-        {day.plan ? <div className="mt-3 space-y-2">{day.plan.warmup_minutes > 0 && <p className="text-sm text-muted">Разминка {day.plan.warmup_minutes} мин: лёгкое движение и пробные подходы без тяжёлого веса.</p>}{day.plan.exercises.map(e => <ExerciseCard key={e.id} exercise={e} />)}{day.plan.cardio_minutes > 0 && <div className="rounded-2xl bg-bg p-3 text-sm"><b>Кардио · {day.plan.cardio_minutes} мин</b><p className="mt-1 text-muted">Ходьба или велосипед в темпе, при котором можно говорить предложениями.{day.plan.exercises.length > 0 ? ' После силовых упражнений.' : ''}</p></div>}</div> : <p className="mt-2 text-sm text-muted">Силовая тренировка на этот день не назначена.</p>}
+        {day.plan ? <div className="mt-3 space-y-2">{day.plan.warmup_minutes > 0 && <p className="text-sm text-muted">Разминка {day.plan.warmup_minutes} мин: лёгкое движение и пробные подходы без тяжёлого веса.</p>}{day.plan.exercises.map(e => <ExerciseCard key={e.id} exercise={e} onInfo={() => setInfo(e)} />)}{day.plan.cardio_minutes > 0 && <div className="rounded-2xl bg-bg p-3 text-sm"><b>Кардио · {day.plan.cardio_minutes} мин</b><p className="mt-1 text-muted">Ходьба или велосипед в темпе, при котором можно говорить предложениями.{day.plan.exercises.length > 0 ? ' После силовых упражнений.' : ''}</p></div>}</div> : <p className="mt-2 text-sm text-muted">Силовая тренировка на этот день не назначена.</p>}
       </details>)}
       {week.notes.length > 0 && <details className="text-sm"><summary className="min-h-[44px] cursor-pointer font-semibold">Как план учёл ваши настройки</summary><ul className="list-disc space-y-2 pl-5 text-muted">{week.notes.map(note => <li key={note}>{note}</li>)}</ul></details>}
       <p className="text-xs text-muted">План повторяется по неделям. Выполненную тренировку записывайте ниже в «Добавить активность».</p>
     </>}
+    {info && <Suspense fallback={<p role="status" className="text-sm">Открываем инструкцию…</p>}><ExerciseInfo key={info.id} exercise={info} onClose={() => setInfo(null)} /></Suspense>}
     {editing && <PlanSetup initial={week?.profile ?? null} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); setRevision(r => r + 1) }} />}
   </section>
 }
