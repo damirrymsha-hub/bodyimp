@@ -13,6 +13,8 @@ import json
 import logging
 import os
 import re
+import math
+import time
 
 import httpx
 
@@ -24,11 +26,16 @@ from services.openrouter_service import (
     compress_image_base64,
 )
 from services.food_resolver import resolve_items
+from services.ai_errors import AnalysisError, provider_error
 
 logger = logging.getLogger(__name__)
 
 # Ансамбль можно выключить переменной окружения AI_ENSEMBLE=0 (напр., для evals).
-ENSEMBLE_ENABLED = os.getenv("AI_ENSEMBLE", "1") != "0"
+ENSEMBLE_ENABLED = os.getenv("AI_ENSEMBLE", "0") != "0"
+# Общий бюджет короче клиентского таймаута; модели не вызываются повторно.
+ANALYSIS_TIMEOUT = 38.0
+_model_cooldown = {}
+_account_cooldown = None
 
 # Few-shot примеры: показываем модели, КАК раскладывать еду на позиции и граммы.
 # Значения kcal_100 и т.п. — реалистичные, чтобы фолбэк без базы тоже был точнее.
@@ -92,24 +99,51 @@ async def _recognize(model: str, user_content) -> dict:
     }
     payload = {
         "model": model,
-        "max_tokens": 900,
+        "max_tokens": 1800,
         "temperature": 0.1,
         "messages": [
             {"role": "system", "content": RECOGNIZE_SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
         ],
     }
-    async with httpx.AsyncClient(timeout=50.0) as client:
+    async with httpx.AsyncClient(timeout=30.0) as client:
         r = await client.post(
             f"{OPENROUTER_BASE_URL}/chat/completions", headers=headers, json=payload
         )
-        r.raise_for_status()
-        data = r.json()
+        try:
+            data = r.json()
+        except ValueError:
+            data = {}
+        if r.is_error or data.get("error"):
+            err = data.get("error", {})
+            # Логируем только код и категорию, без ключа, фото и описания еды.
+            failure = provider_error(r, err)
+            logger.warning("AI provider model=%s status=%s terminal=%s retry_after=%s", model, r.status_code, failure.terminal, failure.retry_after)
+            raise failure
+        choice_error = (data.get("choices") or [{}])[0].get("error")
+        if choice_error:
+            raise provider_error(r, choice_error)
     content = (data.get("choices") or [{}])[0].get("message", {}).get("content", "")
     if not content:
         raise ValueError("empty content")
     result = _extract_json(content)
-    logger.info(f"[v2] {model} recognized: {json.dumps(result, ensure_ascii=False)[:300]}")
+    if not isinstance(result, dict):
+        raise ValueError("invalid recognition object")
+    if result.get("error") == "no_food":
+        return result
+    items = result.get("items")
+    if not isinstance(items, list) or not 1 <= len(items) <= 50:
+        raise ValueError("invalid items")
+    for item in items:
+        if not isinstance(item, dict) or not isinstance(item.get("name"), str) or not item["name"].strip():
+            raise ValueError("invalid item")
+        for field in ("grams", "kcal_100", "protein_100", "fat_100", "carbs_100"):
+            value = item.get(field)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+                raise ValueError("invalid nutrition number")
+        if item["grams"] <= 0:
+            raise ValueError("invalid weight")
+    logger.info("AI recognition succeeded model=%s items=%d", model, len(items))
     return result
 
 
@@ -144,53 +178,60 @@ def _finalize(recognition: dict, model: str) -> dict | None:
 
 
 async def analyze_v2(user_content) -> dict:
-    """
-    Общий вход: user_content — строка (текст) или список блоков (фото).
-    Возвращает итоговый dict либо {"error": "no_food"}. Бросает Exception,
-    если ни одна модель не дала пригодного ответа.
-    """
+    """Единый бюджет времени включает весь перебор, а не каждую попытку отдельно."""
+    global _account_cooldown
     if not OPENROUTER_API_KEY:
-        raise ValueError("OPENROUTER_API_KEY не задан в .env")
+        raise AnalysisError("Сервис ИИ не настроен. Сообщи владельцу приложения.", terminal=True)
+    if _account_cooldown and _account_cooldown[0] > time.monotonic():
+        raise _account_cooldown[1]
+    try:
+        async with asyncio.timeout(ANALYSIS_TIMEOUT):
+            return await _analyze_candidates(user_content)
+    except TimeoutError:
+        raise AnalysisError("ИИ не успел ответить. Попробуй ещё раз позже.", status=504)
 
-    candidates: list[dict] = []
-    last_error: Exception | None = None
 
-    # Ансамбль: две модели параллельно (сбои каждой — не фатальны).
-    models = VISION_MODELS[:2] if ENSEMBLE_ENABLED else VISION_MODELS[:1]
-    results = await asyncio.gather(
-        *[_recognize(m, user_content) for m in models], return_exceptions=True
-    )
-    for model, res in zip(models, results):
-        if isinstance(res, Exception):
-            logger.warning(f"[v2] {model} failed: {res}")
-            last_error = res
+async def _analyze_candidates(user_content) -> dict:
+    global _account_cooldown
+    candidates = []
+    no_food = False
+    last_error = None
+    # Ансамбль сохраняется как явная настройка; по умолчанию экономим квоту.
+    models = list(dict.fromkeys(VISION_MODELS))[:4]
+    for model in models:
+        cooldown = _model_cooldown.get(model)
+        if cooldown and cooldown[0] > time.monotonic():
+            last_error = cooldown[1]
             continue
-        if "error" in res:
-            return {"error": "no_food"}
-        final = _finalize(res, model)
-        if final:
-            candidates.append(final)
-
-    # Резерв: перебираем оставшиеся модели списка, пока одна не справится
-    # (важно при AI_ENSEMBLE=0 — тогда фолбэком служит вторая/третья модель).
-    if not candidates:
-        for reserve in VISION_MODELS[len(models):]:
-            try:
-                res = await _recognize(reserve, user_content)
-            except Exception as e:  # noqa: BLE001
-                last_error = e
+        try:
+            recognition = await _recognize(model, user_content)
+            if recognition.get("error") == "no_food":
+                no_food = True
+                if not ENSEMBLE_ENABLED:
+                    return {"error": "no_food"}
                 continue
-            if "error" in res:
-                return {"error": "no_food"}
-            final = _finalize(res, reserve)
+            final = _finalize(recognition, model)
             if final:
                 candidates.append(final)
-                break
-
+                if not ENSEMBLE_ENABLED or len(candidates) >= 2:
+                    break
+        except AnalysisError as exc:
+            last_error = exc
+            if exc.terminal:
+                if exc.retry_after:
+                    _account_cooldown = (time.monotonic() + exc.retry_after, exc)
+                if candidates:
+                    break
+                raise
+            if exc.retry_after:
+                _model_cooldown[model] = (time.monotonic() + exc.retry_after, exc)
+        except (httpx.HTTPError, ValueError, TypeError, KeyError) as exc:
+            logger.warning("AI invalid response model=%s type=%s", model, type(exc).__name__)
+            last_error = AnalysisError("Не удалось получить корректный ответ ИИ. Попробуй позже.", status=502)
     if not candidates:
-        raise Exception(f"Все модели недоступны. Последняя ошибка: {last_error}")
-
-    # Выбор: больше совпадений с базой → надёжнее цифры; при равенстве — первая.
+        if no_food:
+            return {"error": "no_food"}
+        raise last_error or AnalysisError("Не удалось получить ответ ИИ. Попробуй позже.")
     candidates.sort(key=lambda c: c["_match_ratio"], reverse=True)
     best = candidates[0]
     if len(candidates) == 2:
@@ -208,7 +249,11 @@ async def analyze_text_v2(description: str) -> dict:
 
 async def analyze_photo_v2(image_base64: str, mime_type: str = "image/jpeg") -> dict:
     """Анализ фото через пайплайн v2 (то же распознавание состава)."""
-    image_base64 = compress_image_base64(image_base64, max_size_kb=400)
+    try:
+        image_base64 = compress_image_base64(image_base64, max_size_kb=400)
+    except ValueError:
+        raise AnalysisError("Не удалось прочитать фото. Выбери JPEG, PNG или WebP.", status=400)
+    mime_type = "image/jpeg"  # После нормализации байты всегда соответствуют MIME.
     content = [
         {
             "type": "image_url",

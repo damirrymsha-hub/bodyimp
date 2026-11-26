@@ -1,6 +1,7 @@
 // Сканирование еды по фото (редизайн 1c): скелетон-загрузка, карточка ошибки
 // с повтором того же снимка, результат с правкой перед сохранением.
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { isAxiosError } from 'axios'
 import { analyzePhoto } from '../api/client'
 import type { PhotoAnalysisResult } from '../types'
 import PhotoSourcePicker from '../components/PhotoSourcePicker'
@@ -32,11 +33,16 @@ export default function ScanFood({ onConfirm, onManual }: Props) {
   const [preview, setPreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
   const [result, setResult] = useState<PhotoAnalysisResult | null>(null)
   // Последний снимок — для «Повторить» без пересъёмки.
   const lastFileRef = useRef<File | null>(null)
 
+  // Освобождаем объектный URL при замене снимка и закрытии формы.
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
+
   async function handlePhoto(file: File) {
+    if (loading) return
     lastFileRef.current = file
     setPreview(URL.createObjectURL(file))
     setResult(null)
@@ -46,12 +52,14 @@ export default function ScanFood({ onConfirm, onManual }: Props) {
       const { base64, mime } = await fileToBase64(file)
       const res = await analyzePhoto(base64, mime)
       if (res.error) {
+        setErrorMessage(res.detail || 'Еда не распознана. Уточни описание или выбери другое фото.')
         setFailed(true)
         return
       }
       setResult(res)
     } catch (err) {
-      console.error('Photo analysis error:', err)
+      const detail = isAxiosError(err) ? err.response?.data?.detail : undefined
+      setErrorMessage(typeof detail === 'string' ? detail : 'Не удалось связаться с ИИ. Попробуй позже.')
       setFailed(true)
     } finally {
       setLoading(false)
@@ -77,6 +85,7 @@ export default function ScanFood({ onConfirm, onManual }: Props) {
       {preview && (
         <button
           onClick={reset}
+          disabled={loading}
           className="overflow-hidden rounded-3xl"
           aria-label="Выбрать другое фото"
         >
@@ -90,7 +99,7 @@ export default function ScanFood({ onConfirm, onManual }: Props) {
       {/* Ошибка: фото сохранено, можно повторить */}
       {failed && !loading && (
         <AnalysisError
-          subtitle="Фото сохранено — попробуйте ещё раз или введите вручную"
+          subtitle={errorMessage}
           onRetry={retry}
           onManual={onManual}
         />

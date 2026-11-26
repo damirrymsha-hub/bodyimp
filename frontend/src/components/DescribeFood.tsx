@@ -2,6 +2,7 @@
 // ошибка — карточка с retry (ввод не теряется), результат — с правкой.
 import { useState } from 'react'
 import { Sparkles } from 'lucide-react'
+import { isAxiosError } from 'axios'
 import { analyzeText } from '../api/client'
 import type { PhotoAnalysisResult } from '../types'
 import { haptic } from '../lib/telegram'
@@ -23,6 +24,7 @@ export default function DescribeFood({ onConfirm, onManual }: Props) {
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
   const [result, setResult] = useState<PhotoAnalysisResult | null>(null)
 
   async function analyze() {
@@ -35,12 +37,14 @@ export default function DescribeFood({ onConfirm, onManual }: Props) {
     try {
       const res = await analyzeText(description)
       if (res.error) {
+        setErrorMessage(res.detail || 'Еда не распознана. Уточни описание или выбери другое фото.')
         setFailed(true)
         return
       }
       setResult(res)
     } catch (err) {
-      console.error('Text analysis error:', err)
+      const detail = isAxiosError(err) ? err.response?.data?.detail : undefined
+      setErrorMessage(typeof detail === 'string' ? detail : 'Не удалось связаться с ИИ. Попробуй позже.')
       setFailed(true)
     } finally {
       setLoading(false)
@@ -78,7 +82,7 @@ export default function DescribeFood({ onConfirm, onManual }: Props) {
 
           {failed ? (
             <AnalysisError
-              subtitle="Текст сохранён — попробуйте ещё раз или введите вручную"
+              subtitle={errorMessage}
               onRetry={analyze}
               onManual={onManual}
             />
